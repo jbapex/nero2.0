@@ -1,0 +1,69 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Target, Bot, MessageSquare, BrainCircuit, FileSearch, Paintbrush, Youtube, SearchCode, Globe, BookOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const NodeToolbar = ({ addNode, isLoadingData }) => {
+    const nodeGroups = [
+        {
+            title: 'Nós de Dados',
+            nodes: [
+                { type: 'client', label: 'Adicionar Cliente', icon: Users },
+                { type: 'campaign', label: 'Adicionar Campanha', icon: Target },
+                { type: 'knowledge', label: 'Fonte de Conhecimento', icon: BookOpen, iconColor: 'text-yellow-500' },
+            ]
+        },
+        {
+            title: 'Agentes de IA',
+            nodes: [
+                { type: 'agent', label: 'Adicionar Agente', icon: Bot },
+                { type: 'chat', label: 'Adicionar Chat com IA', icon: MessageSquare },
+            ]
+        },
+        {
+            title: 'Ferramentas Avançadas',
+            nodes: [
+                { type: 'planning', label: 'Planejamento', icon: BrainCircuit },
+                { type: 'analysis', label: 'Análise', icon: FileSearch },
+                { type: 'image_generator', label: 'Gerador de Imagem', icon: Paintbrush },
+                { type: 'video_transcriber', label: 'Transcritor de Vídeo', icon: Youtube, iconColor: 'text-red-500' },
+                { type: 'page_analyzer', label: 'Analisador de Página', icon: SearchCode, iconColor: 'text-cyan-500' },
+                { type: 'site_creator', label: 'Criador de Site', icon: Globe, iconColor: 'text-green-500' },
+            ]
+        }
+    ];
+
+    return (
+        <ScrollArea className="h-full w-full">
+            <div className="p-4">
+                <h2 className="text-xl font-bold mb-6">Ferramentas</h2>
+                <div className="space-y-4">
+                    {nodeGroups.map((group) => (
+                        <motion.div key={group.title} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Card className="hover:shadow-lg transition-shadow">
+                                <CardHeader className="pb-2"><CardTitle className="text-lg">{group.title}</CardTitle></CardHeader>
+                                <CardContent className="flex flex-col space-y-2">
+                                    {group.nodes.map((node) => (
+                                        <Button 
+                                            key={node.type}
+                                            onClick={() => addNode(node.type, node.label.replace('Adicionar ', ''))} 
+                                            variant="outline" 
+                                            className="justify-start" 
+                                            disabled={isLoadingData}
+                                        >
+                                            <node.icon className={`mr-2 h-4 w-4 ${node.iconColor || ''}`} /> {node.label}
+                                        </Button>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        </ScrollArea>
+    );
+};
+
+export default NodeToolbar;
