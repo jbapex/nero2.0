@@ -18,8 +18,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(null);
       return;
     }
-    
-    // Using the RPC function to get consolidated profile data
+
     const { data, error } = await supabase.rpc('get_or_create_profile');
 
     if (error) {
@@ -30,9 +29,38 @@ export const AuthProvider = ({ children }) => {
         description: "Não foi possível carregar os dados do seu perfil.",
       });
       setProfile(null);
-    } else {
-      setProfile(data?.profile);
+      return;
     }
+
+    let profileData = data?.profile ?? null;
+    if (!profileData) {
+      setProfile(null);
+      return;
+    }
+
+    // Se a RPC não retorna os campos do plano, enriquece o perfil buscando o plano pelo plan_id
+    let planId = profileData.plan_id ?? profileData.plan?.id;
+    if (!planId) {
+      const { data: profileRow } = await supabase.from('profiles').select('plan_id').eq('id', userId).single();
+      planId = profileRow?.plan_id ?? null;
+    }
+    if (planId) {
+      const { data: planRow } = await supabase
+        .from('plans')
+        .select('has_site_builder_access, has_ads_access, has_strategic_planner_access, has_campaign_analyzer_access, has_image_generator_access, has_ai_chat_access, has_creative_flow_access, has_transcriber_access, has_trending_topics_access, has_keyword_planner_access, has_publication_calendar_access, has_neurodesign_access')
+        .eq('id', planId)
+        .single();
+
+      if (planRow) {
+        profileData = {
+          ...profileData,
+          plans: { ...profileData.plans, ...planRow },
+          ...planRow,
+        };
+      }
+    }
+
+    setProfile(profileData);
   }, [toast]);
 
   const handleSession = useCallback(async (session) => {
@@ -100,16 +128,28 @@ export const AuthProvider = ({ children }) => {
   }, [toast]);
 
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
+    let { error } = await supabase.auth.signOut();
 
-    if (error) {
+    // Se o servidor diz que a sessão não existe, limpa só no cliente para permitir novo login
+    const sessionInvalid = error?.message?.toLowerCase().includes('session') && error?.message?.toLowerCase().includes('does not exist');
+    if (error && sessionInvalid) {
+      await supabase.auth.signOut({ scope: 'local' });
+      error = null;
+      toast({
+        title: "Sessão encerrada",
+        description: "Você já pode fazer login novamente.",
+      });
+    } else if (error) {
       toast({
         variant: "destructive",
-        title: "Sign out Failed",
-        description: error.message || "Something went wrong",
+        title: "Erro ao sair",
+        description: error.message || "Algo deu errado ao encerrar a sessão.",
       });
     }
 
+    setSession(null);
+    setUser(null);
+    setProfile(null);
     return { error };
   }, [toast]);
 
@@ -128,9 +168,10 @@ export const AuthProvider = ({ children }) => {
       return planHasModule || userHasModule;
     }
 
-    // Handle general feature access checks (e.g., 'site_builder', 'ads')
+    // Handle general feature access checks (e.g., 'site_builder', 'ads', 'neurodesign')
+    // Considera tanto o campo no perfil (flat) quanto no plano (profile.plans)
     const profileKey = `has_${permissionKey}_access`;
-    return !!profile[profileKey];
+    return !!profile[profileKey] || !!profile.plans?.[profileKey];
   }, [profile]);
 
 

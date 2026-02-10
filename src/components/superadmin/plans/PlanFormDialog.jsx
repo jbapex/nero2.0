@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Globe, Megaphone, ClipboardList, Image as ImageIcon, Search, MessageSquare, Share2, FileText, Lightbulb, CalendarDays } from 'lucide-react';
+import { Globe, Megaphone, ClipboardList, Image as ImageIcon, Search, MessageSquare, Share2, FileText, Lightbulb, CalendarDays, Palette } from 'lucide-react';
 
 const accessOptions = [
     { id: 'has_creative_flow_access', label: 'Fluxo Criativo', icon: Share2 },
@@ -21,6 +21,7 @@ const accessOptions = [
     { id: 'has_strategic_planner_access', label: 'Planejamento Estratégico', icon: ClipboardList },
     { id: 'has_campaign_analyzer_access', label: 'Analisador de Ads', icon: Search },
     { id: 'has_image_generator_access', label: 'Gerador de Imagem', icon: ImageIcon },
+    { id: 'has_neurodesign_access', label: 'NeuroDesign', icon: Palette },
     { id: 'has_ai_chat_access', label: 'Chat IA', icon: MessageSquare },
     { id: 'has_transcriber_access', label: 'Transcritor de Vídeo', icon: FileText },
     { id: 'has_trending_topics_access', label: 'Assuntos em Alta', icon: Lightbulb },

@@ -1,0 +1,93 @@
+import React, { useState } from 'react';
+import { Download, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+const MasonryGallery = ({ images, projectId, selectedIds = [], onSelectImage, onDownload }) => {
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [checked, setChecked] = useState(new Set(selectedIds));
+
+  const toggleCheck = (id) => {
+    const next = new Set(checked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setChecked(next);
+  };
+
+  const handleDownloadSelected = () => {
+    if (checked.size === 0) return;
+    images.filter((img) => checked.has(img.id)).forEach((img) => onDownload?.(img.url || img.thumbnail_url));
+  };
+
+  if (!projectId) {
+    return (
+      <div className="text-center text-muted-foreground py-12">
+        Selecione um projeto para ver a galeria.
+      </div>
+    );
+  }
+
+  if (images.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-12">
+        Nenhuma imagem gerada ainda. Use a aba &quot;Criar&quot; para gerar.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-lg">Galeria</h3>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setMultiSelect(!multiSelect)}>
+            {multiSelect ? 'Cancelar seleção' : 'Escolher vários'}
+          </Button>
+          {multiSelect && checked.size > 0 && (
+            <Button size="sm" onClick={handleDownloadSelected}>
+              <Download className="h-4 w-4 mr-1" /> Baixar {checked.size} selecionada(s)
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="columns-2 sm:columns-3 md:columns-4 gap-4 space-y-4">
+        {images.map((img) => {
+          const url = img.url || img.thumbnail_url;
+          const isSelected = selectedIds?.includes?.(img.id) || checked.has(img.id);
+          return (
+            <div
+              key={img.id}
+              className={cn(
+                'break-inside-avoid rounded-lg overflow-hidden border-2 transition-all bg-white/5',
+                isSelected && !multiSelect ? 'border-primary ring-2 ring-primary/30' : 'border-white/10 hover:border-white/20'
+              )}
+            >
+              <button
+                type="button"
+                className="relative block w-full aspect-square"
+                onClick={() => {
+                  if (multiSelect) toggleCheck(img.id);
+                  else onSelectImage?.(img);
+                }}
+              >
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                {multiSelect && (
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                    {checked.has(img.id) ? <Check className="h-4 w-4 text-primary" /> : null}
+                  </div>
+                )}
+                <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center">
+                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onDownload?.(url); }}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default MasonryGallery;

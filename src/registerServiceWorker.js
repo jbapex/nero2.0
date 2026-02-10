@@ -1,7 +1,9 @@
 export function register() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').then(registration => {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  // Só registra em produção e quando sw.js existir (PWA build)
+  if (import.meta.env.DEV) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(registration => {
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
           if (installingWorker == null) {
@@ -27,9 +29,9 @@ export function register() {
             }
           };
         };
-      }).catch(error => {
-        console.error('Error during service worker registration:', error);
-      });
+    }).catch((error) => {
+      if (error?.message?.includes('404')) return;
+      console.error('Error during service worker registration:', error);
     });
-  }
+  });
 }

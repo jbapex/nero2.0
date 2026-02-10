@@ -41,6 +41,7 @@ import React from 'react';
     import CampaignCopilot from '@/pages/user/CampaignCopilot';
     import SitePreview from '@/pages/user/SitePreview';
     import ImageGenerator from '@/pages/user/ImageGenerator';
+    import NeuroDesignPage from '@/pages/user/NeuroDesignPage';
     import MobileMenu from '@/pages/user/MobileMenu';
     import AiChatPage from '@/pages/user/AiChat';
     import PerformanceDashboard from '@/pages/user/PerformanceDashboard';
@@ -189,6 +190,7 @@ import React from 'react';
                         <Route path="ferramentas/planejamento" element={<ProtectedRoute permissionKey="strategic_planner"><StrategicPlannerPage /></ProtectedRoute>} />
                         <Route path="ferramentas/analisador-campanha" element={<ProtectedRoute permissionKey="campaign_analyzer"><CampaignAnalyzer /></ProtectedRoute>} />
                         <Route path="ferramentas/gerador-de-imagens" element={<ProtectedRoute permissionKey="image_generator"><ImageGenerator /></ProtectedRoute>} />
+                        <Route path="ferramentas/neurodesign" element={<ProtectedRoute><NeuroDesignPage /></ProtectedRoute>} />
                         <Route path="ferramentas/assuntos-em-alta" element={<TrendingTopics />} />
                         <Route path="ferramentas/planejador-de-palavras-chave" element={<KeywordPlanner />} />
                         <Route path="ferramentas/calendario-de-publicacao" element={<PublicationCalendar />} />

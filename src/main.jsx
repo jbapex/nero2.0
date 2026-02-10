@@ -9,7 +9,7 @@ import React from 'react';
     
     ReactDOM.createRoot(document.getElementById('root')).render(
       <React.StrictMode>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ThemeProvider defaultTheme="dark" storageKey="neuro-apice-theme">
             <AuthProvider>
               <App />

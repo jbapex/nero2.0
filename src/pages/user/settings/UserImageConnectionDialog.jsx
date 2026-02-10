@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/customSupabaseClient';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useDebounce } from '@/hooks/use-debounce';
 
-const imageProviderOptions = ['Google'];
+const imageProviderOptions = ['Google', 'OpenRouter'];
 
 const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFinished }) => {
   const { user } = useAuth();
   const [showApiKey, setShowApiKey] = useState(false);
+  const [openRouterImageModels, setOpenRouterImageModels] = useState([]);
+  const [isLoadingImageModels, setIsLoadingImageModels] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     provider: 'Google',
@@ -30,15 +33,49 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
     default_model: 'gemini-1.5-flash-image-preview'
   });
 
+  const debouncedApiKey = useDebounce(formData.api_key, 500);
+
+  const fetchOpenRouterImageModels = useCallback(async (apiKey) => {
+    if (!apiKey) return;
+    setIsLoadingImageModels(true);
+    setOpenRouterImageModels([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-openrouter-models', {
+        body: { apiKey },
+      });
+      if (error) throw new Error(error.message);
+      const list = data?.models ?? data?.data ?? (Array.isArray(data) ? data : []);
+      const imageModels = Array.isArray(list)
+        ? list.filter((m) => m?.architecture?.output_modalities?.includes?.('image'))
+        : [];
+      const sorted = imageModels.slice().sort((a, b) => (a.name || a.id || '').localeCompare(b.name || b.id || ''));
+      setOpenRouterImageModels(sorted);
+    } catch (err) {
+      toast.error('Falha ao buscar modelos de imagem', { description: 'Verifique a chave da API OpenRouter e tente novamente.' });
+      setOpenRouterImageModels([]);
+    } finally {
+      setIsLoadingImageModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (formData.provider === 'OpenRouter' && debouncedApiKey) {
+      fetchOpenRouterImageModels(debouncedApiKey);
+    } else {
+      setOpenRouterImageModels([]);
+    }
+  }, [formData.provider, debouncedApiKey, fetchOpenRouterImageModels]);
+
   useEffect(() => {
     if (isOpen) {
         if (editingConnection) {
+            const prov = editingConnection.provider || 'Google';
             setFormData({
                 name: editingConnection.name || '',
-                provider: editingConnection.provider || 'Google',
+                provider: prov,
                 api_key: editingConnection.api_key || '',
-                api_url: editingConnection.api_url || 'https://generativelanguage.googleapis.com/v1beta',
-                default_model: editingConnection.default_model || 'gemini-1.5-flash-image-preview',
+                api_url: editingConnection.api_url || (prov === 'OpenRouter' ? 'https://openrouter.ai/api/v1' : 'https://generativelanguage.googleapis.com/v1beta'),
+                default_model: editingConnection.default_model || (prov === 'OpenRouter' ? '' : 'gemini-1.5-flash-image-preview'),
             });
         } else {
             setFormData(getInitialFormData());
@@ -50,8 +87,12 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
   const handleProviderChange = (value) => {
     const newFormData = { ...formData, provider: value };
     if (value === 'Google') {
-        newFormData.api_url = 'https://generativelanguage.googleapis.com/v1beta';
-        newFormData.default_model = 'gemini-1.5-flash-image-preview';
+      newFormData.api_url = 'https://generativelanguage.googleapis.com/v1beta';
+      newFormData.default_model = 'gemini-1.5-flash-image-preview';
+    } else if (value === 'OpenRouter') {
+      // OpenRouter: geração de imagem via chat/completions com modalities ["image","text"]
+      newFormData.api_url = 'https://openrouter.ai/api/v1';
+      newFormData.default_model = '';
     } else {
       newFormData.api_url = '';
       newFormData.default_model = '';
@@ -63,6 +104,10 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
     e.preventDefault();
     if (!formData.name || !formData.api_key) {
       toast.error("Campos obrigatórios", { description: "Por favor, preencha o nome e a chave da API." });
+      return;
+    }
+    if (formData.provider === 'OpenRouter' && !formData.default_model) {
+      toast.error("Selecione um modelo", { description: "Escolha um modelo de geração de imagem do OpenRouter." });
       return;
     }
 
@@ -107,7 +152,7 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
           </div>
           <div>
             <Label htmlFor="conn-provider">Provedor</Label>
-            <Select onValueChange={handleProviderChange} value={formData.provider} disabled>
+            <Select onValueChange={handleProviderChange} value={formData.provider}>
               <SelectTrigger id="conn-provider" className="w-full glass-input">
                 <SelectValue placeholder="Selecione um provedor" />
               </SelectTrigger>
@@ -116,6 +161,37 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
               </SelectContent>
             </Select>
           </div>
+          {formData.provider === 'OpenRouter' && (
+            <div>
+              <Label htmlFor="conn-default_model">Modelo de geração de imagem</Label>
+              <Select
+                value={formData.default_model || ''}
+                onValueChange={(value) => setFormData({ ...formData, default_model: value })}
+                disabled={isLoadingImageModels}
+              >
+                <SelectTrigger id="conn-default_model" className="w-full glass-input">
+                  {isLoadingImageModels ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando modelos...
+                    </span>
+                  ) : openRouterImageModels.length === 0 ? (
+                    <SelectValue placeholder="Informe a chave da API acima para carregar os modelos" />
+                  ) : (
+                    <SelectValue placeholder="Selecione um modelo de geração de imagem" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 text-white border-white/20 max-h-60">
+                  {openRouterImageModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name || model.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">Lista apenas modelos com suporte a geração de imagem no OpenRouter.</p>
+            </div>
+          )}
           <div>
             <Label htmlFor="conn-api_key">Chave da API (API Key)</Label>
             <div className="relative">
@@ -124,7 +200,7 @@ const UserImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFin
                 {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Sua chave é armazenada de forma segura e usada apenas para se comunicar com a API do Google.</p>
+            <p className="text-xs text-muted-foreground mt-2">Sua chave é armazenada de forma segura e usada apenas para se comunicar com a API do provedor.</p>
           </div>
           
           <DialogFooter>

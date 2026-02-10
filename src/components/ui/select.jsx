@@ -22,6 +22,9 @@ const useSelectContext = () => {
   return context;
 };
 
+const TriggerWrapper = React.forwardRef(({ asChild, ...props }, ref) => <div ref={ref} {...props} />);
+TriggerWrapper.displayName = 'TriggerWrapper';
+
 const Select = (props) => {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   
@@ -53,23 +56,18 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
   const { isDesktop } = useSelectContext();
   const TriggerComponent = isDesktop ? SelectPrimitive.Trigger : DrawerTrigger;
   const IconComponent = isDesktop ? SelectPrimitive.Icon : 'div';
-  
+  const triggerClassName = cn(
+    'flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+    className
+  );
   return (
-     <TriggerComponent
-      ref={ref}
-      asChild
-      className={cn(
-        'flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-        className
-      )}
-      {...props}
-    >
-      <div>
+    <TriggerComponent ref={ref} asChild className={triggerClassName} {...props}>
+      <TriggerWrapper ref={ref} className={triggerClassName}>
         {children}
         <IconComponent asChild>
           <ChevronDown className="h-4 w-4 opacity-50" />
         </IconComponent>
-      </div>
+      </TriggerWrapper>
     </TriggerComponent>
   );
 });

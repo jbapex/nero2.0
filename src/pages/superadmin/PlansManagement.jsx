@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Package, DollarSign, Users, BrainCircuit, Repeat, Globe, Megaphone, ClipboardList, Image as ImageIcon, Search, MessageSquare, Share2, FileText, Lightbulb, CalendarDays } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, DollarSign, Users, BrainCircuit, Repeat, Globe, Megaphone, ClipboardList, Image as ImageIcon, Search, MessageSquare, Share2, FileText, Lightbulb, CalendarDays, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
@@ -34,6 +34,7 @@ const PlansManagement = () => {
     has_trending_topics_access: false,
     has_keyword_planner_access: false,
     has_publication_calendar_access: false,
+    has_neurodesign_access: false,
     plan_image_generation_config: {
       max_size: 1024,
       max_images_per_job: 2,
@@ -105,6 +106,7 @@ const PlansManagement = () => {
       has_trending_topics_access: formData.has_trending_topics_access,
       has_keyword_planner_access: formData.has_keyword_planner_access,
       has_publication_calendar_access: formData.has_publication_calendar_access,
+      has_neurodesign_access: formData.has_neurodesign_access,
       plan_image_generation_config: {
         ...formData.plan_image_generation_config,
         max_size: parseInt(formData.plan_image_generation_config.max_size),
@@ -194,6 +196,7 @@ const PlansManagement = () => {
       has_trending_topics_access: plan.has_trending_topics_access || false,
       has_keyword_planner_access: plan.has_keyword_planner_access || false,
       has_publication_calendar_access: plan.has_publication_calendar_access || false,
+      has_neurodesign_access: plan.has_neurodesign_access || false,
       plan_image_generation_config: {
         max_size: plan.plan_image_generation_config?.max_size || 1024,
         max_images_per_job: plan.plan_image_generation_config?.max_images_per_job || 2,
@@ -251,6 +254,7 @@ const PlansManagement = () => {
     if(plan.has_trending_topics_access) accesses.push({ icon: Lightbulb, label: 'Assuntos em Alta' });
     if(plan.has_keyword_planner_access) accesses.push({ icon: Search, label: 'Planejador de Palavras' });
     if(plan.has_publication_calendar_access) accesses.push({ icon: CalendarDays, label: 'Calendário de Posts' });
+    if(plan.has_neurodesign_access) accesses.push({ icon: Palette, label: 'NeuroDesign' });
     return accesses;
   }
 
@@ -324,9 +328,10 @@ const PlansManagement = () => {
                     <div>
                         <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center">Suíte de Ferramentas:</p>
                         <div className="text-xs space-y-1">
-                            {getAccessList(plan).length > 0 ? getAccessList(plan).map(access => (
-                              <p key={access.label} className="flex items-center gap-2"><access.icon className="w-3 h-3 text-primary" /> {access.label}</p>
-                            )) : <p>Nenhuma ferramenta especial inclusa.</p>}
+                            {getAccessList(plan).length > 0 ? getAccessList(plan).map(access => {
+                              const Icon = access.icon;
+                              return <p key={access.label} className="flex items-center gap-2"><Icon className="w-3 h-3 text-primary" /> {access.label}</p>;
+                            }) : <p>Nenhuma ferramenta especial inclusa.</p>}
                         </div>
                     </div>
                     {plan.has_image_generator_access && plan.plan_image_generation_config && (

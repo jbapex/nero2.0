@@ -45,7 +45,8 @@ const ImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFinishe
   const handleProviderChange = (value) => {
     const newFormData = { ...formData, provider: value };
     if (value === 'OpenRouter') {
-      newFormData.api_base_url = 'https://openrouter.ai/api/v1/images/generations';
+      // OpenRouter gera imagem via chat/completions com modalities: ["image","text"]
+      newFormData.api_base_url = 'https://openrouter.ai/api/v1';
     } else if (value === 'OpenAI') {
       newFormData.api_base_url = 'https://api.openai.com/v1/images/generations';
     } else if (value === 'Google') {
@@ -92,7 +93,14 @@ const ImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFinishe
       <DialogContent className="glass-effect border-white/20 text-white max-w-md">
         <DialogHeader>
           <DialogTitle>{editingConnection ? 'Editar Conexão de Imagem' : 'Nova Conexão de Imagem'}</DialogTitle>
-          <DialogDescription className="text-gray-400">{editingConnection ? 'Atualize os dados da conexão' : 'Preencha os dados da nova conexão'}</DialogDescription>
+          <DialogDescription className="text-gray-400">
+            {editingConnection ? 'Atualize os dados da conexão' : 'Preencha os dados da nova conexão'}
+            {formData.provider === 'OpenRouter' && (
+              <span className="block mt-2 text-xs text-amber-400/90">
+                OpenRouter usa a API de chat com modalities para geração de imagem (veja documentação).
+              </span>
+            )}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

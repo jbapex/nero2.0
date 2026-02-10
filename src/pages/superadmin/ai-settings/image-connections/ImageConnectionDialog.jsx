@@ -45,7 +45,8 @@ const ImageConnectionDialog = ({ isOpen, setIsOpen, editingConnection, onFinishe
   const handleProviderChange = (value) => {
     const newFormData = { ...formData, provider: value };
     if (value === 'OpenRouter') {
-      newFormData.api_base_url = 'https://openrouter.ai/api/v1/images/generations';
+      // OpenRouter: geração de imagem via chat/completions com modalities: ["image","text"]
+      newFormData.api_base_url = 'https://openrouter.ai/api/v1';
     } else if (value === 'OpenAI') {
       newFormData.api_base_url = 'https://api.openai.com/v1/images/generations';
     } else {

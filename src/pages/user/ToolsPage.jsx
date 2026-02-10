@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowRight, Bot, Image, FileText, BarChart2, Clapperboard, Share2, PenSquare, MessagesSquare, Lightbulb, Search, CalendarDays, Globe, Lock } from 'lucide-react';
+import { ArrowRight, Bot, FileText, BarChart2, Clapperboard, Share2, PenSquare, MessagesSquare, Lightbulb, Search, CalendarDays, Globe, Lock, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const allTools = [
@@ -37,11 +37,11 @@ const allTools = [
         permissionKey: 'site_builder',
     },
     { 
-        title: 'Gerador de Imagens', 
-        description: 'Crie imagens únicas e de alta qualidade para suas campanhas.', 
-        icon: <Image className="h-8 w-8 text-primary" />,
-        path: '/ferramentas/gerador-de-imagens',
-        permissionKey: 'image_generator',
+        title: 'NeuroDesign', 
+        description: 'Design Builder premium: crie imagens com sujeito, cenário, texto e controle total de composição.', 
+        icon: <Palette className="h-8 w-8 text-primary" />,
+        path: '/ferramentas/neurodesign',
+        permissionKey: null, // liberado para todos os planos por enquanto
     },
     {
         title: 'Ferramenta de Transcrição',

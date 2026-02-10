@@ -27,13 +27,12 @@ const ImageModelDialog = ({ isOpen, setIsOpen, editingModel, connection, onFinis
         try {
           const { data, error } = await supabase.functions.invoke('get-openrouter-models');
           if (error) throw error;
-          const imageModels = data.filter(model =>
-            model.id.toLowerCase().includes('stable-diffusion') ||
-            model.id.toLowerCase().includes('sdxl') ||
-            model.id.toLowerCase().includes('dall-e') ||
-            model.id.toLowerCase().includes('playground')
+          const list = data?.models ?? data?.data ?? (Array.isArray(data) ? data : []);
+          const imageModels = list.filter((m) =>
+            m?.architecture?.output_modalities?.includes?.('image')
           );
-          setOpenRouterModels(imageModels || []);
+          const sorted = imageModels.slice().sort((a, b) => (a.name || a.id || '').localeCompare(b.name || b.id || ''));
+          setOpenRouterModels(sorted);
         } catch (error) {
           toast({
             title: "Erro ao buscar modelos de imagem",
