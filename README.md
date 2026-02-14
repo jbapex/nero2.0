@@ -77,11 +77,14 @@ src/
 Crie um arquivo `.env.local` com as seguintes variáveis:
 
 ```env
-VITE_SUPABASE_URL=sua_url_do_supabase
+# Produção: Neuro em neuro.jbapex.com.br, Supabase em dados.jbapex.com.br
+VITE_SUPABASE_URL=https://dados.jbapex.com.br
 VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
 VITE_OPENAI_API_KEY=sua_chave_da_openai
 VITE_GOOGLE_AI_API_KEY=sua_chave_do_google_ai
 ```
+
+**Auth (login):** No Supabase (dados.jbapex.com.br), adicione `https://neuro.jbapex.com.br/**` em *Redirect URLs* (Auth → URL Configuration) para o login funcionar.
 
 ## 📄 Licença
 
