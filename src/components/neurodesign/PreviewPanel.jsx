@@ -39,7 +39,7 @@ const SELECTION_FONT_STYLES = [
 
 const isDemoPlaceholder = (url) => url && typeof url === 'string' && url.includes('placehold.co');
 
-const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage }) => {
+const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage, hasImageConnection = true }) => {
   const { toast } = useToast();
   const [refineInstruction, setRefineInstruction] = useState('');
   const [refineDimensions, setRefineDimensions] = useState('1:1');
@@ -511,8 +511,9 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 )}
                 <Button
                   onClick={handleRefineClick}
-                  disabled={!hasAnyRefineAction || isUploadingRefine}
+                  disabled={!hasImageConnection || !hasAnyRefineAction || isUploadingRefine}
                   className="shrink-0"
+                  title={!hasImageConnection ? 'Selecione uma conexão de imagem no builder para refinar' : undefined}
                 >
                   {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                   Refinar
@@ -533,8 +534,9 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   />
                   <Button
                     onClick={handleRefineClick}
-                    disabled={!hasAnyRefineAction || isUploadingRefine}
+                    disabled={!hasImageConnection || !hasAnyRefineAction || isUploadingRefine}
                     className="shrink-0"
+                    title={!hasImageConnection ? 'Selecione uma conexão de imagem no builder para refinar' : undefined}
                   >
                     {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                     Refinar

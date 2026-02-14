@@ -173,10 +173,13 @@ const NeuroDesignPage = () => {
       const newImages = data?.images;
       if (newImages?.length) {
         const withIds = newImages.map((img, i) => ({ ...img, id: img.id || `temp-${i}`, run_id: img.run_id || data.runId, project_id: project.id }));
-        setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
+        // Mostrar primeiro no preview (área principal) e depois na lista de criações — evita atraso visual
         setSelectedImage(withIds[0]);
+        setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
         toast({ title: 'Imagens geradas com sucesso!' });
-        Promise.all([fetchRuns(project.id), fetchImages(project.id)]).catch(() => {});
+        fetchRuns(project.id).catch(() => {});
+        // Atualizar lista do banco depois de um tempo, para não sobrescrever com dados antigos e causar atraso
+        setTimeout(() => fetchImages(project.id).catch(() => {}), 2500);
       } else {
         toast({ title: 'Geração concluída', description: `Nenhuma imagem retornada. Verifique se a Edge Function ${fnName} está publicada no Supabase.`, variant: 'destructive' });
       }
@@ -251,11 +254,18 @@ const NeuroDesignPage = () => {
       if (error) throw new Error(refineErrMsg || 'Falha ao chamar o servidor de refino.');
       if (data?.error) throw new Error(serverMsg || 'Falha ao chamar o servidor de refino.');
       if (data?.images?.length) {
-        await fetchImages(project.id);
-        await fetchRuns(project.id);
-        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', project.id).order('created_at', { ascending: false }).range(0, 4);
-        if (imgList?.length) setSelectedImage(imgList[0]);
+        // Atualizar primeiro a área principal (preview), depois a lista de criações — mesma ordem do handleGenerate
+        const withIds = data.images.map((img, i) => ({
+          ...img,
+          id: img.id || `temp-refine-${i}`,
+          run_id: img.run_id ?? data.runId ?? runId,
+          project_id: project.id,
+        }));
+        setSelectedImage(withIds[0]);
+        setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
         toast({ title: 'Imagem refinada com sucesso!' });
+        fetchRuns(project.id).catch(() => {});
+        setTimeout(() => fetchImages(project.id).catch(() => {}), 2500);
       }
     } catch (e) {
       const msg = e?.message || 'Erro desconhecido';
@@ -505,6 +515,7 @@ Regras:
                   onRefine={handleRefine}
                   onDownload={downloadHandler}
                   onSelectImage={setSelectedImage}
+                  hasImageConnection={!!(currentConfig?.user_ai_connection_id && currentConfig.user_ai_connection_id !== 'none')}
                 />
               </div>
             </div>

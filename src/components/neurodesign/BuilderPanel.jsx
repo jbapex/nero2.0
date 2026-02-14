@@ -555,7 +555,12 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
       </div>
 
       <div className="flex gap-2">
-        <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={() => onGenerate?.(localConfig)} disabled={isGenerating}>
+        <Button
+          className="flex-1 bg-primary hover:bg-primary/90"
+          onClick={() => onGenerate?.(localConfig)}
+          disabled={isGenerating || !localConfig.user_ai_connection_id || localConfig.user_ai_connection_id === 'none'}
+          title={(!localConfig.user_ai_connection_id || localConfig.user_ai_connection_id === 'none') ? 'Selecione uma conexão de imagem para gerar' : undefined}
+        >
           {isGenerating ? <span className="animate-pulse">Gerando...</span> : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Imagem</>}
         </Button>
         <Button variant="outline" size="icon" onClick={() => setConfig?.({ ...localConfig, id: undefined })} title="Duplicar configuração">
