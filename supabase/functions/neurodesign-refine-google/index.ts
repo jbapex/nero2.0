@@ -224,9 +224,15 @@ serve(async (req) => {
       textPrompt = (textPrompt + addPart).trim();
     }
 
+    const dimensionsForApi = (dimensionsOverride || (configOverrides?.dimensions as string) || "").trim() || "1:1";
+    const aspectRatioForPrompt = getAspectRatio(dimensionsForApi);
+    if (aspectRatioForPrompt && aspectRatioForPrompt !== "1:1") {
+      textPrompt = (textPrompt + ` Important: output the image in ${aspectRatioForPrompt} aspect ratio.`).trim();
+    }
+
     let refinedUrl: string | null = null;
     try {
-      const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsOverride || (configOverrides?.dimensions as string));
+      const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
       if (result) refinedUrl = result.url;
     } catch (apiErr) {
       await supabase
@@ -244,7 +250,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Refino não retornou imagem da API Google" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { width, height } = getDimensionsFromConfig(configOverrides?.dimensions as string | undefined);
+    const { width, height } = getDimensionsFromConfig(dimensionsForApi);
     const imageRow = {
       run_id: run.id,
       project_id: projectId,

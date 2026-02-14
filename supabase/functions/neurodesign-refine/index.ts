@@ -252,6 +252,12 @@ serve(async (req) => {
       textPrompt = (textPrompt + addPart).trim();
     }
 
+    const dimensionsForApi = (dimensionsOverride || (configOverrides?.dimensions as string) || "").trim() || "1:1";
+    const aspectRatioForPrompt = getAspectRatio(dimensionsForApi);
+    if (aspectRatioForPrompt && aspectRatioForPrompt !== "1:1") {
+      textPrompt = (textPrompt + ` Important: output the image in ${aspectRatioForPrompt} aspect ratio.`).trim();
+    }
+
     if (userAiConnectionId && sourceImageUrl) {
       const { data: conn } = await supabase
         .from("user_ai_connections")
@@ -262,13 +268,13 @@ serve(async (req) => {
         const apiUrl = (conn.api_url || "").toLowerCase();
         try {
           if (apiUrl.includes("openrouter")) {
-            const result = await refineWithOpenRouter(conn as Conn, imageUrls, textPrompt, dimensionsOverride || configOverrides?.dimensions as string);
+            const result = await refineWithOpenRouter(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "openrouter";
             }
           } else if (apiUrl.includes("generativelanguage") || conn.provider?.toLowerCase() === "google") {
-            const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsOverride || configOverrides?.dimensions as string);
+            const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "google";
@@ -283,7 +289,7 @@ serve(async (req) => {
       }
     }
 
-    const { width, height } = getDimensionsFromConfig(configOverrides?.dimensions as string | undefined);
+    const { width, height } = getDimensionsFromConfig(dimensionsForApi);
     const imageRow = {
       run_id: run.id,
       project_id: projectId,
