@@ -102,3 +102,34 @@ Veja se o container/serviço está **Up** ou **active (running)**. Se estiver, a
 | Na VPS   | 3) Reiniciar o serviço das Edge Functions (ex.: `docker compose restart functions`) |
 
 Sempre que mudar algo nas pastas **supabase/functions/** e der push no GitHub, repita na VPS: **git pull** e **restart** do serviço das funções.
+
+---
+
+## Alternativa: copiar para o volume do Docker e atualizar o service
+
+Se na sua VPS as funções são servidas a partir do volume `/root/supabase/docker/volumes/functions/` e você usa **Docker Swarm** (ou `docker service`), use este fluxo:
+
+### 1. Atualizar o projeto (se ainda não tiver puxado do GitHub)
+
+```bash
+cd /root/neuroapice
+git pull origin main
+```
+
+### 2. Copiar as funções do NeuroDesign para o volume das functions
+
+```bash
+cp -r /root/neuroapice/supabase/functions/neurodesign-generate \
+      /root/neuroapice/supabase/functions/neurodesign-generate-google \
+      /root/neuroapice/supabase/functions/neurodesign-refine \
+      /root/neuroapice/supabase/functions/neurodesign-refine-google \
+      /root/supabase/docker/volumes/functions/
+```
+
+### 3. Forçar atualização do serviço das functions
+
+```bash
+docker service update --force supabase_supabase_functions
+```
+
+Assim o serviço recarrega o código das pastas copiadas. Ajuste os caminhos (`/root/neuroapice`, `/root/supabase/docker/volumes/functions/`) e o nome do service (`supabase_supabase_functions`) se na sua VPS forem diferentes.
