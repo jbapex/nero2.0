@@ -106,7 +106,8 @@ const NeuroDesignPage = () => {
       .from('neurodesign_generated_images')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, 4);
     if (error) {
       toast({ title: 'Erro ao carregar galeria', description: error.message, variant: 'destructive' });
       return;
@@ -159,17 +160,11 @@ const NeuroDesignPage = () => {
       if (data?.error) throw new Error(data.error);
       const newImages = data?.images;
       if (newImages?.length) {
-        await fetchRuns(selectedProject.id);
-        await fetchImages(selectedProject.id);
-        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', selectedProject.id).order('created_at', { ascending: false });
-        if (imgList?.length) {
-          setSelectedImage(imgList[0]);
-        } else {
-          const withIds = newImages.map((img, i) => ({ ...img, id: img.id || `temp-${i}`, run_id: img.run_id || data.runId, project_id: selectedProject.id }));
-          setImages((prev) => [...withIds, ...prev]);
-          setSelectedImage(withIds[0]);
-        }
+        const withIds = newImages.map((img, i) => ({ ...img, id: img.id || `temp-${i}`, run_id: img.run_id || data.runId, project_id: selectedProject.id }));
+        setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
+        setSelectedImage(withIds[0]);
         toast({ title: 'Imagens geradas com sucesso!' });
+        Promise.all([fetchRuns(selectedProject.id), fetchImages(selectedProject.id)]).catch(() => {});
       } else {
         toast({ title: 'Geração concluída', description: `Nenhuma imagem retornada. Verifique se a Edge Function ${fnName} está publicada no Supabase.`, variant: 'destructive' });
       }
@@ -235,7 +230,7 @@ const NeuroDesignPage = () => {
       if (data?.images?.length) {
         await fetchImages(selectedProject.id);
         await fetchRuns(selectedProject.id);
-        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', selectedProject.id).order('created_at', { ascending: false });
+        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', selectedProject.id).order('created_at', { ascending: false }).range(0, 4);
         if (imgList?.length) setSelectedImage(imgList[0]);
         toast({ title: 'Imagem refinada com sucesso!' });
       }
@@ -382,7 +377,7 @@ Regras:
         <meta name="description" content="Design Builder premium: crie imagens com controle total de composição." />
       </Helmet>
       <NeuroDesignErrorBoundary>
-      <div className="flex h-[calc(100vh-4rem)] min-h-[400px] bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white overflow-hidden min-w-0">
+      <div className="flex h-[calc(100vh-4rem)] min-h-[400px] bg-muted/40 text-foreground overflow-hidden min-w-0">
         {isLg && (
           <NeuroDesignSidebar
             view={view}
@@ -395,11 +390,11 @@ Regras:
         )}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden min-h-0">
           {!isLg && (
-            <div className="flex items-center gap-2 p-2 border-b border-white/10 shrink-0">
+            <div className="flex items-center gap-2 p-2 border-b border-border shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-border hover:bg-muted"
                 onClick={() => setSidebarDrawerOpen(true)}
               >
                 <FolderOpen className="h-4 w-4 mr-1" />
@@ -409,7 +404,7 @@ Regras:
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-white/20 text-white hover:bg-white/10"
+                  className="border-border hover:bg-muted"
                   onClick={() => setBuilderDrawerOpen(true)}
                 >
                   <PanelLeft className="h-4 w-4 mr-1" />
@@ -421,7 +416,7 @@ Regras:
           {view === 'create' && (
             <div className="flex flex-1 min-w-0 min-h-0">
               {isLg && (
-                <div className="w-[420px] xl:w-[480px] shrink-0 overflow-y-auto border-r border-white/10 min-h-0">
+                <div className="w-[420px] xl:w-[480px] shrink-0 overflow-y-auto border-r border-border bg-card min-h-0">
                   <BuilderPanel
                     project={selectedProject}
                     config={currentConfig}
@@ -472,7 +467,7 @@ Regras:
       {/* Drawer Projetos (mobile/tablet) */}
       <Dialog open={sidebarDrawerOpen} onOpenChange={setSidebarDrawerOpen}>
         <DialogContent
-          className="fixed left-0 top-0 h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 rounded-none border-r p-0 gap-0 flex flex-col bg-gray-900 border-white/10 data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left"
+          className="fixed left-0 top-0 h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 rounded-none border-r border-border p-0 gap-0 flex flex-col bg-card data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left"
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <NeuroDesignSidebar
@@ -491,11 +486,11 @@ Regras:
       {/* Drawer Configurações (mobile/tablet) */}
       <Dialog open={builderDrawerOpen} onOpenChange={setBuilderDrawerOpen}>
         <DialogContent
-          className="fixed left-0 top-0 h-full w-full max-w-md translate-x-0 translate-y-0 rounded-none border-r p-0 gap-0 grid-rows-auto bg-gray-900 border-white/10 data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left overflow-hidden flex flex-col"
+          className="fixed left-0 top-0 h-full w-full max-w-md translate-x-0 translate-y-0 rounded-none border-r border-border p-0 gap-0 grid-rows-auto bg-card data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left overflow-hidden flex flex-col"
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <div className="p-4 border-b border-white/10 shrink-0">
-            <h3 className="font-semibold text-white">Configurações de geração</h3>
+          <div className="p-4 border-b border-border shrink-0">
+            <h3 className="font-semibold text-foreground">Configurações de geração</h3>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
             <BuilderPanel

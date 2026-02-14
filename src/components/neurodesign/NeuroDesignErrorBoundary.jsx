@@ -15,7 +15,7 @@ class NeuroDesignErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white text-center">
+        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-background text-foreground text-center border border-border rounded-lg">
           <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Algo deu errado no NeuroDesign</h2>
           <p className="text-muted-foreground text-sm mb-4 max-w-md">

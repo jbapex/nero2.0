@@ -174,22 +174,15 @@ async function generateWithGoogleGemini(
   if (subjectImageUrls.length > 0) textPrompt = SUBJECT_FACE_INSTRUCTION + textPrompt;
   if (styleReferenceUrls.length > 0) textPrompt = (styleInstruction || STYLE_REFERENCE_INSTRUCTION) + textPrompt;
   if (logoUrl?.trim()) textPrompt = LOGO_INSTRUCTION + textPrompt;
+  const urlsToFetch: string[] = [
+    ...subjectImageUrls.slice(0, 2),
+    ...styleReferenceUrls.slice(0, 3),
+    ...(logoUrl?.trim() ? [logoUrl.trim()] : []),
+  ];
+  const fetchResults = await Promise.all(urlsToFetch.map(fetchImageAsBase64));
   const contentParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
-  if (subjectImageUrls.length > 0) {
-    for (const subjectUrl of subjectImageUrls.slice(0, 2)) {
-      const img = await fetchImageAsBase64(subjectUrl);
-      if (img) contentParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-    }
-  }
-  if (styleReferenceUrls.length > 0) {
-    for (const styleUrl of styleReferenceUrls.slice(0, 3)) {
-      const img = await fetchImageAsBase64(styleUrl);
-      if (img) contentParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-    }
-  }
-  if (logoUrl?.trim()) {
-    const logoImg = await fetchImageAsBase64(logoUrl.trim());
-    if (logoImg) contentParts.push({ inlineData: { mimeType: logoImg.mimeType, data: logoImg.data } });
+  for (const img of fetchResults) {
+    if (img) contentParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
   }
   contentParts.push({ text: textPrompt });
   const body = {
@@ -354,6 +347,12 @@ serve(async (req) => {
       provider_response_json: { images: insertedImages },
       completed_at: new Date().toISOString(),
     }).eq("id", run.id);
+
+    const { data: toKeep } = await supabase.from("neurodesign_generated_images").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).range(0, 4);
+    const keepSet = new Set((toKeep || []).map((r) => r.id));
+    const { data: all } = await supabase.from("neurodesign_generated_images").select("id").eq("project_id", projectId);
+    const idsToDelete = (all || []).filter((r) => !keepSet.has(r.id)).map((r) => r.id);
+    if (idsToDelete.length > 0) await supabase.from("neurodesign_generated_images").delete().in("id", idsToDelete);
 
     const payload = insertedImages?.length
       ? insertedImages

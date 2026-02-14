@@ -88,11 +88,11 @@ const NeuroDesignSidebar = ({
     }
   };
 
-  const asideClass = wrapperClassName ?? 'w-64 shrink-0 border-r border-white/10 bg-black/20 flex flex-col';
+  const asideClass = wrapperClassName ?? 'w-64 shrink-0 border-r border-border bg-card flex flex-col';
   return (
     <aside className={asideClass}>
-      <div className="p-4 border-b border-white/10">
-        <h2 className="font-semibold text-lg text-white">NeuroDesign</h2>
+      <div className="p-4 border-b border-border">
+        <h2 className="font-semibold text-lg text-foreground">NeuroDesign</h2>
         <p className="text-xs text-muted-foreground mt-1">Design Builder</p>
       </div>
       <nav className="p-2 space-y-1">
@@ -101,7 +101,7 @@ const NeuroDesignSidebar = ({
           onClick={() => handleSetView('explore')}
           className={cn(
             'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-            view === 'explore' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/5'
+            view === 'explore' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted'
           )}
         >
           <FolderOpen className="h-4 w-4" />
@@ -112,7 +112,7 @@ const NeuroDesignSidebar = ({
           onClick={() => handleSetView('create')}
           className={cn(
             'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-            view === 'create' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/5'
+            view === 'create' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted'
           )}
         >
           <LayoutGrid className="h-4 w-4" />
@@ -123,20 +123,20 @@ const NeuroDesignSidebar = ({
           onClick={() => handleSetView('gallery')}
           className={cn(
             'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-            view === 'gallery' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/5'
+            view === 'gallery' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted'
           )}
         >
           <ImageIcon className="h-4 w-4" />
           Minha Galeria
         </button>
       </nav>
-      <div className="p-3 border-t border-white/10 flex gap-2">
+      <div className="p-3 border-t border-border flex gap-2">
         <Input
           placeholder="Novo projeto"
           value={newProjectName}
           onChange={(e) => setNewProjectName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-          className="bg-white/5 border-white/20 text-white placeholder:text-gray-500 h-9"
+          className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-9"
         />
         <Button
           size="icon"
@@ -161,7 +161,7 @@ const NeuroDesignSidebar = ({
                   title={p.name}
                   className={cn(
                     'flex-1 min-w-0 text-left rounded-lg px-3 py-2 text-sm truncate transition-colors',
-                    selectedProject?.id === p.id ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-muted-foreground'
+                    selectedProject?.id === p.id ? 'bg-primary/20 text-primary' : 'hover:bg-muted text-muted-foreground'
                   )}
                 >
                   {p.name}

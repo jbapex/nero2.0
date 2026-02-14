@@ -232,7 +232,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
   return (
     <div className="flex flex-col h-full p-4 sm:p-6 min-h-0 max-w-[900px] xl:max-w-[1000px] mx-auto w-full">
-      <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-black/20 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 min-h-0 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
         {isLoading && (
           <div className="flex flex-col items-center gap-4 text-muted-foreground">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -241,7 +241,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
         )}
         {!isLoading && !imageUrl && (
           <div className="flex flex-col items-center gap-4 text-muted-foreground text-center px-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
               <Sparkles className="h-10 w-10 text-primary/60" />
             </div>
             <p className="font-medium">Aguardando criação</p>
@@ -268,7 +268,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
             {isDrawing && drawBox()}
             {!isDrawing && selectionBox()}
             {showDemoNotice && (
-              <div className="mt-3 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-sm text-center max-w-md">
+              <div className="mt-3 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-700 dark:text-amber-200 text-sm text-center max-w-md">
                 Modo demonstração: imagem de exemplo. Selecione uma conexão de imagem (ex.: OpenRouter) no builder para gerar imagens reais.
               </div>
             )}
@@ -280,7 +280,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 <Download className="h-4 w-4 mr-1" /> Download
               </Button>
               {selectionRegion && (
-                <Button size="sm" variant="outline" onClick={clearSelection} className="border-white/30">
+                <Button size="sm" variant="outline" onClick={clearSelection} className="border-border">
                   <Crop className="h-4 w-4 mr-1" /> Limpar seleção
                 </Button>
               )}
@@ -302,13 +302,13 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   <div className="flex items-center gap-2">
                     {referenceArtPreviewUrl ? (
                       <div className="relative">
-                        <img src={referenceArtPreviewUrl} alt="Ref arte" className="w-14 h-14 rounded object-cover border border-white/20" />
-                        <button type="button" onClick={clearReferenceArt} className="absolute -top-1 -right-1 bg-black/70 rounded-full p-0.5">
+                        <img src={referenceArtPreviewUrl} alt="Ref arte" className="w-14 h-14 rounded object-cover border border-border" />
+                        <button type="button" onClick={clearReferenceArt} className="absolute -top-1 -right-1 bg-foreground/80 text-background rounded-full p-0.5">
                           <X className="h-3 w-3" />
                         </button>
                       </div>
                     ) : (
-                      <label className="w-14 h-14 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5 shrink-0">
+                      <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0">
                         <Upload className="h-4 w-4" />
                         <input type="file" accept="image/*" className="hidden" onChange={handleReferenceArtChange} />
                       </label>
@@ -321,13 +321,13 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   <div className="flex items-center gap-2">
                     {replacementPreviewUrl ? (
                       <div className="relative">
-                        <img src={replacementPreviewUrl} alt="Substituir" className="w-14 h-14 rounded object-cover border border-white/20" />
-                        <button type="button" onClick={clearReplacement} className="absolute -top-1 -right-1 bg-black/70 rounded-full p-0.5">
+                        <img src={replacementPreviewUrl} alt="Substituir" className="w-14 h-14 rounded object-cover border border-border" />
+                        <button type="button" onClick={clearReplacement} className="absolute -top-1 -right-1 bg-foreground/80 text-background rounded-full p-0.5">
                           <X className="h-3 w-3" />
                         </button>
                       </div>
                     ) : (
-                      <label className="w-14 h-14 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5 shrink-0">
+                      <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0">
                         <Upload className="h-4 w-4" />
                         <input type="file" accept="image/*" className="hidden" onChange={handleReplacementChange} />
                       </label>
@@ -343,7 +343,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 placeholder="Instrução de ajuste (ex: deixe o fundo mais escuro, substitua a camiseta pela imagem anexa)"
                 value={refineInstruction}
                 onChange={(e) => setRefineInstruction(e.target.value)}
-                className="flex-1 min-h-[60px] bg-white/5 border-white/20 text-white resize-none min-w-0"
+                className="flex-1 min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none min-w-0"
               />
               <Button
                 onClick={handleRefineClick}
@@ -359,18 +359,18 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
         {/* Criações deste projeto: grid que desce para baixo, sem ultrapassar a largura da tela */}
         {images.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-white/10 min-w-0">
+          <div className="mt-6 pt-4 border-t border-border min-w-0">
             <p className="text-xs text-muted-foreground font-medium mb-3">Criações deste projeto</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {images.map((img) => {
+              {images.slice(0, 5).map((img) => {
                 const url = img.url || img.thumbnail_url;
                 const isSelected = selectedImage?.id === img.id;
                 return (
                   <div
                     key={img.id}
                     className={cn(
-                      'aspect-square rounded-lg overflow-hidden border-2 transition-all bg-white/5',
-                      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-white/10 hover:border-white/30'
+                      'aspect-square rounded-lg overflow-hidden border-2 transition-all bg-muted/50',
+                      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
                     )}
                   >
                     <button
@@ -379,7 +379,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                       onClick={() => onSelectImage?.(img)}
                     >
                       <img src={url} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center">
+                      <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-foreground/40 flex items-center justify-center">
                         <Button
                           size="icon"
                           variant="secondary"
@@ -401,14 +401,14 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
       {/* Modal tela cheia para a arte gerada */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
         <DialogContent
-          className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 gap-0 border-0 bg-black/95 overflow-hidden [&>button]:hidden"
+          className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 gap-0 border-0 bg-background/95 dark:bg-black/95 overflow-hidden [&>button]:hidden"
           onPointerDownOutside={() => setFullscreenOpen(false)}
           onEscapeKeyDown={() => setFullscreenOpen(false)}
         >
           <button
             type="button"
             onClick={() => setFullscreenOpen(false)}
-            className="absolute top-4 right-4 z-50 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 transition-colors"
+            className="absolute top-4 right-4 z-50 rounded-full bg-foreground/80 p-2 text-background hover:bg-foreground transition-colors"
             aria-label="Fechar tela cheia"
           >
             <X className="h-6 w-6" />

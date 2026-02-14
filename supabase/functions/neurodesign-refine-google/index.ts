@@ -33,12 +33,11 @@ async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPromp
   const baseUrl = conn.api_url.replace(/\/$/, "");
   const model = conn.default_model || "gemini-2.5-flash-image";
   const apiUrl = `${baseUrl}/models/${model}:generateContent`;
-  const parts: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> = [];
-  for (const imageUrl of imageUrls) {
-    const img = await imageUrlToBase64(imageUrl);
-    if (!img) return null;
-    parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-  }
+  const results = await Promise.all(imageUrls.map(imageUrlToBase64));
+  if (results.some((r) => r === null)) return null;
+  const parts: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> = results
+    .filter((r): r is { data: string; mimeType: string } => r !== null)
+    .map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }));
   parts.push({ text: textPrompt });
   const body = {
     contents: [{ parts }],
@@ -225,6 +224,12 @@ serve(async (req) => {
       provider_response_json: { images: insertedImages },
       completed_at: new Date().toISOString(),
     }).eq("id", run.id);
+
+    const { data: toKeep } = await supabase.from("neurodesign_generated_images").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).range(0, 4);
+    const keepSet = new Set((toKeep || []).map((r) => r.id));
+    const { data: all } = await supabase.from("neurodesign_generated_images").select("id").eq("project_id", projectId);
+    const idsToDelete = (all || []).filter((r) => !keepSet.has(r.id)).map((r) => r.id);
+    if (idsToDelete.length > 0) await supabase.from("neurodesign_generated_images").delete().in("id", idsToDelete);
 
     return new Response(JSON.stringify({ runId: run.id, images: insertedImages || [imageRow] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

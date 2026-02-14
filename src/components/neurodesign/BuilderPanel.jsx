@@ -174,14 +174,14 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
   return (
     <div className="p-4 space-y-6">
       {typeof onFillFromPrompt === 'function' && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+        <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
           <Label className="text-sm font-medium">Preencher com IA</Label>
           <p className="text-xs text-muted-foreground">Cole um prompt ou brief de outra IA e preencha os campos abaixo automaticamente.</p>
           <Textarea
             placeholder="Cole aqui o prompt ou descrição da arte que deseja criar..."
             value={fillPromptInput}
             onChange={(e) => setFillPromptInput(e.target.value)}
-            className="min-h-[80px] bg-white/5 border-white/20 text-white text-sm resize-none"
+            className="min-h-[80px] bg-muted border-border text-foreground placeholder:text-muted-foreground text-sm resize-none"
             disabled={isFillingFromPrompt}
           />
           <Button
@@ -208,10 +208,10 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
           value={localConfig.user_ai_connection_id || 'none'}
           onValueChange={(v) => update('user_ai_connection_id', v === 'none' ? null : v)}
         >
-          <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
+          <SelectTrigger className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground">
             <SelectValue placeholder="Selecione uma conexão" />
           </SelectTrigger>
-          <SelectContent className="bg-gray-800 text-white border-white/20">
+          <SelectContent className="bg-popover text-popover-foreground border-border">
             <SelectItem value="none">Usar mock (sem conexão)</SelectItem>
             {imageConnections.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name} ({c.provider})</SelectItem>
@@ -234,43 +234,43 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <Label>Sujeito principal</Label>
         <div className="mt-1 flex gap-2 flex-wrap">
           {(localConfig.subject_image_urls || []).map((url, i) => (
-            <div key={i} className="relative w-16 h-16 rounded overflow-hidden bg-white/10">
+            <div key={i} className="relative w-16 h-16 rounded overflow-hidden bg-muted">
               <img src={url} alt="" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage('subject_image_urls', i); }}
-                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-black/70 hover:bg-black/90 text-white rounded-bl cursor-pointer touch-manipulation"
+                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
                 aria-label="Remover imagem do sujeito"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           ))}
-          <label className="w-16 h-16 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5">
+          <label className="w-16 h-16 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted">
             <Upload className="h-5 w-5 text-muted-foreground" />
             <input type="file" accept="image/*" className="hidden" multiple onChange={(e) => handleUpload('subject', e.target.files)} />
           </label>
         </div>
         <Select value={localConfig.subject_gender || 'feminino'} onValueChange={(v) => update('subject_gender', v)}>
-          <SelectTrigger className="mt-2 bg-white/5 border-white/20 text-white">
+          <SelectTrigger className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-gray-800 text-white">
+          <SelectContent className="bg-popover text-popover-foreground">
             <SelectItem value="feminino">Feminino</SelectItem>
             <SelectItem value="masculino">Masculino</SelectItem>
           </SelectContent>
         </Select>
-        <Textarea placeholder="Descrição pose/roupa" value={localConfig.subject_description || ''} onChange={(e) => update('subject_description', e.target.value)} className="mt-2 bg-white/5 border-white/20 text-white min-h-[60px]" />
+        <Textarea placeholder="Descrição pose/roupa" value={localConfig.subject_description || ''} onChange={(e) => update('subject_description', e.target.value)} className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px]" />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label>Quantidade (1-5)</Label>
           <Select value={String(localConfig.quantity || 1)} onValueChange={(v) => update('quantity', parseInt(v, 10))}>
-            <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
+            <SelectTrigger className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 text-white">
+            <SelectContent className="bg-popover text-popover-foreground">
               {[1, 2, 3, 4, 5].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -278,10 +278,10 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <div>
           <Label>Posição</Label>
           <Select value={localConfig.layout_position || 'centro'} onValueChange={(v) => update('layout_position', v)}>
-            <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
+            <SelectTrigger className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 text-white">
+            <SelectContent className="bg-popover text-popover-foreground">
               {LAYOUT_POSITIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -292,7 +292,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <Label>Dimensões</Label>
         <div className="flex flex-wrap gap-2 mt-2">
           {DIMENSIONS.map((d) => (
-            <Button key={d.value} type="button" variant={localConfig.dimensions === d.value ? 'default' : 'outline'} size="sm" onClick={() => update('dimensions', d.value)} className={localConfig.dimensions === d.value ? 'bg-primary' : 'border-white/20'}>
+            <Button key={d.value} type="button" variant={localConfig.dimensions === d.value ? 'default' : 'outline'} size="sm" onClick={() => update('dimensions', d.value)} className={localConfig.dimensions === d.value ? 'bg-primary' : 'border-border'}>
               {d.label}
             </Button>
           ))}
@@ -306,14 +306,14 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         </div>
         {localConfig.text_enabled && (
           <div className="mt-2 space-y-2">
-            <Input placeholder="Título H1" value={localConfig.headline_h1 || ''} onChange={(e) => update('headline_h1', e.target.value)} className="bg-white/5 border-white/20 text-white" />
-            <Input placeholder="Subtítulo H2" value={localConfig.subheadline_h2 || ''} onChange={(e) => update('subheadline_h2', e.target.value)} className="bg-white/5 border-white/20 text-white" />
-            <Input placeholder="Texto do botão CTA" value={localConfig.cta_button_text || ''} onChange={(e) => update('cta_button_text', e.target.value)} className="bg-white/5 border-white/20 text-white" />
+            <Input placeholder="Título H1" value={localConfig.headline_h1 || ''} onChange={(e) => update('headline_h1', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground" />
+            <Input placeholder="Subtítulo H2" value={localConfig.subheadline_h2 || ''} onChange={(e) => update('subheadline_h2', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground" />
+            <Input placeholder="Texto do botão CTA" value={localConfig.cta_button_text || ''} onChange={(e) => update('cta_button_text', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground" />
             <Select value={localConfig.text_position || 'centro'} onValueChange={(v) => update('text_position', v)}>
-              <SelectTrigger className="bg-white/5 border-white/20 text-white">
+              <SelectTrigger className="bg-muted border-border text-foreground placeholder:text-muted-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-800 text-white">
+              <SelectContent className="bg-popover text-popover-foreground">
                 {LAYOUT_POSITIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -327,19 +327,19 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <p className="text-xs text-muted-foreground mt-1">A logo anexa será incluída na imagem gerada em posição adequada.</p>
         <div className="flex gap-2 flex-wrap items-center mt-2">
           {localConfig.logo_url ? (
-            <div className="relative w-14 h-14 rounded overflow-hidden bg-white/10 shrink-0">
+            <div className="relative w-14 h-14 rounded overflow-hidden bg-muted shrink-0">
               <img src={localConfig.logo_url} alt="Logo" className="w-full h-full object-contain" />
               <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); update('logo_url', ''); }}
-            className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-black/70 hover:bg-black/90 text-white rounded-bl cursor-pointer touch-manipulation"
+            className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
             aria-label="Remover logo"
           >
             <X className="h-4 w-4" />
           </button>
             </div>
           ) : null}
-          <label className="w-14 h-14 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5 shrink-0">
+          <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0">
             <Upload className="h-4 w-4" />
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload('logo', e.target.files)} />
           </label>
@@ -348,25 +348,25 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
 
       <div>
         <Label>Projeto e cenário</Label>
-        <Input placeholder="Nicho/projeto (ex: nutricionista high ticket)" value={localConfig.niche_project || ''} onChange={(e) => update('niche_project', e.target.value)} className="mt-1 bg-white/5 border-white/20 text-white" />
-        <Textarea placeholder="Ambiente (ex: cozinha iluminada...)" value={localConfig.environment || ''} onChange={(e) => update('environment', e.target.value)} className="mt-2 bg-white/5 border-white/20 text-white min-h-[60px]" />
+        <Input placeholder="Nicho/projeto (ex: nutricionista high ticket)" value={localConfig.niche_project || ''} onChange={(e) => update('niche_project', e.target.value)} className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground" />
+        <Textarea placeholder="Ambiente (ex: cozinha iluminada...)" value={localConfig.environment || ''} onChange={(e) => update('environment', e.target.value)} className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px]" />
         <div className="flex items-center gap-2 mt-2"><Switch checked={!!localConfig.use_scenario_photos} onCheckedChange={(v) => update('use_scenario_photos', v)} /><Label className="text-xs">Usar fotos de cenário</Label></div>
         {localConfig.use_scenario_photos && (
           <div className="flex gap-2 flex-wrap mt-2">
             {(localConfig.scenario_photo_urls || []).map((url, i) => (
-              <div key={i} className="relative w-14 h-14 rounded overflow-hidden bg-white/10">
+              <div key={i} className="relative w-14 h-14 rounded overflow-hidden bg-muted">
                 <img src={url} alt="" className="w-full h-full object-cover" />
                 <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage('scenario_photo_urls', i); }}
-                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-black/70 hover:bg-black/90 text-white rounded-bl cursor-pointer touch-manipulation"
+                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
                 aria-label="Remover foto de cenário"
               >
                 <X className="h-4 w-4" />
               </button>
               </div>
             ))}
-            <label className="w-14 h-14 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5">
+            <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted">
               <Upload className="h-4 w-4" />
               <input type="file" accept="image/*" className="hidden" multiple onChange={(e) => handleUpload('scenario', e.target.files)} />
             </label>
@@ -377,19 +377,19 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
       <div>
         <Label>Cores e iluminação</Label>
         <div className="grid grid-cols-3 gap-2 mt-2">
-          <div><Label className="text-xs">Ambiente</Label><Input type="text" placeholder="#hex" value={localConfig.ambient_color || ''} onChange={(e) => update('ambient_color', e.target.value)} className="bg-white/5 border-white/20 text-white h-8" /></div>
-          <div><Label className="text-xs">Recorte</Label><Input type="text" placeholder="#hex" value={localConfig.rim_light_color || ''} onChange={(e) => update('rim_light_color', e.target.value)} className="bg-white/5 border-white/20 text-white h-8" /></div>
-          <div><Label className="text-xs">Preenchimento</Label><Input type="text" placeholder="#hex" value={localConfig.fill_light_color || ''} onChange={(e) => update('fill_light_color', e.target.value)} className="bg-white/5 border-white/20 text-white h-8" /></div>
+          <div><Label className="text-xs">Ambiente</Label><Input type="text" placeholder="#hex" value={localConfig.ambient_color || ''} onChange={(e) => update('ambient_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
+          <div><Label className="text-xs">Recorte</Label><Input type="text" placeholder="#hex" value={localConfig.rim_light_color || ''} onChange={(e) => update('rim_light_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
+          <div><Label className="text-xs">Preenchimento</Label><Input type="text" placeholder="#hex" value={localConfig.fill_light_color || ''} onChange={(e) => update('fill_light_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
         </div>
       </div>
 
       <div>
         <Label>Composição (tipo de plano)</Label>
         <Select value={localConfig.shot_type || 'medio busto'} onValueChange={(v) => update('shot_type', v)}>
-          <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
+          <SelectTrigger className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-gray-800 text-white">
+          <SelectContent className="bg-popover text-popover-foreground">
             {SHOT_TYPES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -401,7 +401,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
           <Switch checked={!!localConfig.floating_elements_enabled} onCheckedChange={(v) => update('floating_elements_enabled', v)} />
         </div>
         {localConfig.floating_elements_enabled && (
-          <Input placeholder="Ex: shot saudável, frutas e verduras" value={localConfig.floating_elements_text || ''} onChange={(e) => update('floating_elements_text', e.target.value)} className="mt-2 bg-white/5 border-white/20 text-white" />
+          <Input placeholder="Ex: shot saudável, frutas e verduras" value={localConfig.floating_elements_text || ''} onChange={(e) => update('floating_elements_text', e.target.value)} className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground" />
         )}
       </div>
 
@@ -410,19 +410,19 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <p className="text-xs text-muted-foreground mt-1">Envie imagens para a IA usar como referência visual (JPEG, PNG, WebP ou GIF, até 10MB).</p>
         <div className="flex gap-2 flex-wrap mt-2">
           {(localConfig.style_reference_urls || []).map((url, i) => (
-            <div key={i} className="relative w-14 h-14 rounded overflow-hidden bg-white/10 shrink-0">
+            <div key={i} className="relative w-14 h-14 rounded overflow-hidden bg-muted shrink-0">
               <img src={url} alt="" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage('style_reference_urls', i); }}
-                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-black/70 hover:bg-black/90 text-white rounded-bl cursor-pointer touch-manipulation"
+                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
                 aria-label="Remover referência de estilo"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           ))}
-          <label className="relative w-14 h-14 rounded border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:bg-white/5 shrink-0 overflow-hidden">
+          <label className="relative w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0 overflow-hidden">
             <input
               ref={styleRefsInputRef}
               id="neurodesign-style-refs-upload"
@@ -444,7 +444,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
           </label>
         </div>
         {(localConfig.style_reference_urls || []).map((url, i) => (
-          <div key={i} className="mt-3 p-2 rounded bg-white/5 border border-white/10">
+          <div key={i} className="mt-3 p-2 rounded bg-muted/50 border border-border">
             <Label className="text-xs text-muted-foreground">Referência {i + 1} – O que copiar desta?</Label>
             <Input
               placeholder="Ex: iluminação e paleta de cores, composição, estética vintage..."
@@ -455,7 +455,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
                 arr[i] = e.target.value;
                 update('style_reference_instructions', arr);
               }}
-              className="mt-1 bg-white/5 border-white/20 text-white text-sm"
+              className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground text-sm"
             />
           </div>
         ))}
@@ -467,7 +467,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         <Label className="text-xs mt-2 block">Tags de estilo</Label>
         <div className="flex flex-wrap gap-1 mt-1">
           {STYLE_TAGS.map((tag) => (
-            <Button key={tag} type="button" variant={(localConfig.visual_attributes?.style_tags || []).includes(tag) ? 'default' : 'outline'} size="sm" onClick={() => toggleStyleTag(tag)} className="text-xs h-7 border-white/20">
+            <Button key={tag} type="button" variant={(localConfig.visual_attributes?.style_tags || []).includes(tag) ? 'default' : 'outline'} size="sm" onClick={() => toggleStyleTag(tag)} className="text-xs h-7 border-border">
               {tag}
             </Button>
           ))}
@@ -481,7 +481,7 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
 
       <div>
         <Label>Prompt adicional</Label>
-        <Textarea placeholder="Instruções extras para a IA" value={localConfig.additional_prompt || ''} onChange={(e) => update('additional_prompt', e.target.value)} className="mt-1 bg-white/5 border-white/20 text-white min-h-[80px]" />
+        <Textarea placeholder="Instruções extras para a IA" value={localConfig.additional_prompt || ''} onChange={(e) => update('additional_prompt', e.target.value)} className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[80px]" />
       </div>
 
       <div className="flex gap-2">

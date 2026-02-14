@@ -58,8 +58,8 @@ const MasonryGallery = ({ images, projectId, selectedIds = [], onSelectImage, on
             <div
               key={img.id}
               className={cn(
-                'break-inside-avoid rounded-lg overflow-hidden border-2 transition-all bg-white/5',
-                isSelected && !multiSelect ? 'border-primary ring-2 ring-primary/30' : 'border-white/10 hover:border-white/20'
+                'break-inside-avoid rounded-lg overflow-hidden border-2 transition-all bg-muted/50',
+                isSelected && !multiSelect ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
               )}
             >
               <button
@@ -72,11 +72,11 @@ const MasonryGallery = ({ images, projectId, selectedIds = [], onSelectImage, on
               >
                 <img src={url} alt="" className="w-full h-full object-cover" />
                 {multiSelect && (
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
-                    {checked.has(img.id) ? <Check className="h-4 w-4 text-primary" /> : null}
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-foreground/60 text-background flex items-center justify-center">
+                    {checked.has(img.id) ? <Check className="h-4 w-4" /> : null}
                   </div>
                 )}
-                <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center">
+                <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-foreground/40 flex items-center justify-center">
                   <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onDownload?.(url); }}>
                     <Download className="h-4 w-4" />
                   </Button>
