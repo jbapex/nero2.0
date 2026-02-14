@@ -16,6 +16,12 @@ function getDimensionsFromConfig(dimensions: string | undefined): { width: numbe
   return { width: 1024, height: 1024 };
 }
 
+function getAspectRatio(dimensions: string | undefined): string {
+  const d = (dimensions || "1:1").trim();
+  if (d === "4:5" || d === "9:16" || d === "16:9") return d;
+  return "1:1";
+}
+
 type Conn = { id: number; user_id: string; provider: string; api_key: string; api_url: string; default_model: string | null };
 
 async function imageUrlToBase64(imageUrl: string): Promise<{ data: string; mimeType: string } | null> {
@@ -49,17 +55,19 @@ function buildContentOpenRouter(imageUrls: string[], textPrompt: string): Array<
   return content;
 }
 
-async function refineWithOpenRouter(conn: Conn, imageUrls: string[], textPrompt: string): Promise<{ url: string } | null> {
+async function refineWithOpenRouter(conn: Conn, imageUrls: string[], textPrompt: string, dimensions: string | undefined): Promise<{ url: string } | null> {
   const baseUrl = conn.api_url.replace(/\/$/, "");
   const url = `${baseUrl}/chat/completions`;
   const model = conn.default_model || "google/gemini-2.0-flash-exp:free";
   const content = buildContentOpenRouter(imageUrls, textPrompt);
-  const body = {
+  const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user" as const, content }],
     modalities: ["image", "text"],
     stream: false,
   };
+  const aspectRatio = getAspectRatio(dimensions);
+  if (aspectRatio) body.image_config = { aspect_ratio: aspectRatio };
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${conn.api_key}`, "Content-Type": "application/json" },
@@ -74,7 +82,7 @@ async function refineWithOpenRouter(conn: Conn, imageUrls: string[], textPrompt:
   return outUrl ? { url: outUrl } : null;
 }
 
-async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPrompt: string): Promise<{ url: string } | null> {
+async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPrompt: string, dimensions: string | undefined): Promise<{ url: string } | null> {
   const baseUrl = conn.api_url.replace(/\/$/, "");
   const model = conn.default_model || "gemini-2.5-flash-image";
   const apiUrl = `${baseUrl}/models/${model}:generateContent`;
@@ -84,9 +92,13 @@ async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPromp
     .filter((r): r is { data: string; mimeType: string } => r !== null)
     .map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }));
   parts.push({ text: textPrompt });
+  const aspectRatio = getAspectRatio(dimensions);
   const body = {
     contents: [{ parts }],
-    generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+    generationConfig: {
+      responseModalities: ["TEXT", "IMAGE"],
+      ...(aspectRatio && { imageConfig: { aspectRatio, imageSize: "1K" as const } }),
+    },
   };
   const res = await fetch(apiUrl, {
     method: "POST",
@@ -250,13 +262,13 @@ serve(async (req) => {
         const apiUrl = (conn.api_url || "").toLowerCase();
         try {
           if (apiUrl.includes("openrouter")) {
-            const result = await refineWithOpenRouter(conn as Conn, imageUrls, textPrompt);
+            const result = await refineWithOpenRouter(conn as Conn, imageUrls, textPrompt, dimensionsOverride || configOverrides?.dimensions as string);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "openrouter";
             }
           } else if (apiUrl.includes("generativelanguage") || conn.provider?.toLowerCase() === "google") {
-            const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt);
+            const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsOverride || configOverrides?.dimensions as string);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "google";

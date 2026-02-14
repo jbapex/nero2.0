@@ -14,6 +14,12 @@ function getDimensionsFromConfig(dimensions: string | undefined): { width: numbe
   return { width: 1024, height: 1024 };
 }
 
+function getAspectRatio(dimensions: string | undefined): string {
+  const d = (dimensions || "1:1").trim();
+  if (d === "4:5" || d === "9:16" || d === "16:9") return d;
+  return "1:1";
+}
+
 type Conn = { id: number; user_id: string; provider: string; api_key: string; api_url: string; default_model: string | null };
 
 async function imageUrlToBase64(imageUrl: string): Promise<{ data: string; mimeType: string } | null> {
@@ -37,7 +43,7 @@ async function imageUrlToBase64(imageUrl: string): Promise<{ data: string; mimeT
   }
 }
 
-async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPrompt: string): Promise<{ url: string } | null> {
+async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPrompt: string, dimensions: string | undefined): Promise<{ url: string } | null> {
   const baseUrl = conn.api_url.replace(/\/$/, "");
   const model = conn.default_model || "gemini-2.5-flash-image";
   const apiUrl = `${baseUrl}/models/${model}:generateContent`;
@@ -47,9 +53,13 @@ async function refineWithGoogleGemini(conn: Conn, imageUrls: string[], textPromp
     .filter((r): r is { data: string; mimeType: string } => r !== null)
     .map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }));
   parts.push({ text: textPrompt });
+  const aspectRatio = getAspectRatio(dimensions);
   const body = {
     contents: [{ parts }],
-    generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+    generationConfig: {
+      responseModalities: ["TEXT", "IMAGE"],
+      ...(aspectRatio && { imageConfig: { aspectRatio, imageSize: "1K" as const } }),
+    },
   };
   const res = await fetch(apiUrl, {
     method: "POST",
@@ -216,7 +226,7 @@ serve(async (req) => {
 
     let refinedUrl: string | null = null;
     try {
-      const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt);
+      const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsOverride || (configOverrides?.dimensions as string));
       if (result) refinedUrl = result.url;
     } catch (apiErr) {
       await supabase
