@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const STORAGE_BUCKET = "neurodesign";
+
+function getStoragePathFromPublicUrl(imageUrl: string, supabaseUrl: string): string | null {
+  const base = supabaseUrl.replace(/\/$/, "");
+  const prefix = `${base}/storage/v1/object/public/${STORAGE_BUCKET}/`;
+  if (!imageUrl || !imageUrl.startsWith(prefix)) return null;
+  return imageUrl.slice(prefix.length);
+}
+
+async function ensureFetchableUrl(
+  imageUrl: string,
+  supabaseUrl: string,
+  supabase: { storage: { from: (bucket: string) => { createSignedUrl: (path: string, expiresIn: number) => Promise<{ data: { signedUrl: string } | null; error: unknown }> } } }
+): Promise<string> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  const path = getStoragePathFromPublicUrl(imageUrl, supabaseUrl);
+  if (!path) return imageUrl;
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 120);
+  if (error || !data?.signedUrl) return imageUrl;
+  return data.signedUrl;
+}
+
 function getDimensionsFromConfig(dimensions: string | undefined): { width: number; height: number } {
   const d = (dimensions || "1:1").trim();
   if (d === "4:5") return { width: 1024, height: 1280 };
@@ -230,9 +252,30 @@ serve(async (req) => {
       textPrompt = (textPrompt + ` Important: output the image in ${aspectRatioForPrompt} aspect ratio.`).trim();
     }
 
+    const resolvedImageUrls: string[] = [];
+    for (const u of imageUrls) {
+      resolvedImageUrls.push(await ensureFetchableUrl(u, supabaseUrl, supabase));
+    }
+
+    const userUploadUrls: { url: string; label: string }[] = [];
+    if (referenceImageUrl) userUploadUrls.push({ url: referenceImageUrl, label: "referência de arte" });
+    if (replacementImageUrl) userUploadUrls.push({ url: replacementImageUrl, label: "imagem para substituir" });
+    if (addImageUrl) userUploadUrls.push({ url: addImageUrl, label: "imagem para adicionar na cena" });
+    if (regionCropImageUrl) userUploadUrls.push({ url: regionCropImageUrl, label: "região selecionada" });
+    for (let i = 0; i < userUploadUrls.length; i++) {
+      const resolved = resolvedImageUrls[imageUrls.indexOf(userUploadUrls[i].url)] ?? userUploadUrls[i].url;
+      const data = await imageUrlToBase64(resolved);
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: `Não foi possível acessar a imagem de ${userUploadUrls[i].label}. Verifique o upload e tente novamente.` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     let refinedUrl: string | null = null;
     try {
-      const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
+      const result = await refineWithGoogleGemini(conn as Conn, resolvedImageUrls, textPrompt, dimensionsForApi);
       if (result) refinedUrl = result.url;
     } catch (apiErr) {
       await supabase

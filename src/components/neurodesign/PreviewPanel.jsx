@@ -35,6 +35,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const [drawCurrent, setDrawCurrent] = useState(null);
   const previewContainerRef = useRef(null);
   const previewImgRef = useRef(null);
+  const instructionInputRef = useRef(null);
   const referenceArtInputRef = useRef(null);
   const replacementInputRef = useRef(null);
   const addImageInputRef = useRef(null);
@@ -174,7 +175,13 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     const region = getNormalizedRegion();
     setDrawStart(null);
     setDrawCurrent(null);
-    if (region) setSelectionRegion(region);
+    if (region) {
+      setSelectionRegion(region);
+      requestAnimationFrame(() => {
+        instructionInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        instructionInputRef.current?.focus();
+      });
+    }
   };
 
   const clearSelection = () => {
@@ -308,7 +315,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
         {!isLoading && imageUrl && (
           <div
             ref={previewContainerRef}
-            className="relative w-full h-full flex flex-col items-center justify-center p-4"
+            className="relative w-full h-full flex flex-col items-center justify-center p-4 cursor-crosshair"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -342,31 +349,38 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 </Button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Arraste na imagem para selecionar uma região (opcional).</p>
+            <p className="text-xs text-muted-foreground mt-2">Arraste na imagem para selecionar a região a refinar. Desenhe um retângulo na área que quer alterar.</p>
           </div>
         )}
       </div>
 
-      {/* Área rolável: opções de refino + lista de criações */}
+      {/* Área rolável: O que fazer + opções avançadas + lista de criações */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         {!isLoading && imageUrl && (
           <>
-            <div className="mt-4 space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">Opções avançadas (opcional)</p>
+            {/* Bloco principal: O que você quer fazer? */}
+            <div className="mt-4 space-y-3" role="region" aria-label="Refinamento">
+              <p className="text-sm font-medium text-foreground">O que você quer fazer?</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Textarea
+                  ref={instructionInputRef}
+                  placeholder="Descreva o ajuste (ex.: deixe o fundo mais escuro) ou use uma imagem abaixo."
+                  value={refineInstruction}
+                  onChange={(e) => setRefineInstruction(e.target.value)}
+                  className="flex-1 min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none min-w-0"
+                  aria-label="Instrução de refinamento: descreva o ajuste ou use uma imagem abaixo"
+                />
+                <Button
+                  onClick={handleRefineClick}
+                  disabled={!hasAnyRefineAction || isUploadingRefine}
+                  className="shrink-0"
+                >
+                  {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                  Refinar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Ou envie uma imagem:</p>
               <div className="flex flex-wrap gap-4">
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
-                  <Select value={refineDimensions} onValueChange={setRefineDimensions}>
-                    <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover text-popover-foreground">
-                      {REFINE_DIMENSIONS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">Referência de arte</label>
                   <div className="flex items-center gap-2">
@@ -469,21 +483,22 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
               </div>
             </div>
 
-            <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              <Textarea
-                placeholder="Instrução de ajuste (ex: deixe o fundo mais escuro, substitua a camiseta pela imagem anexa)"
-                value={refineInstruction}
-                onChange={(e) => setRefineInstruction(e.target.value)}
-                className="flex-1 min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none min-w-0"
-              />
-              <Button
-                onClick={handleRefineClick}
-                disabled={!hasAnyRefineAction || isUploadingRefine}
-                className="shrink-0"
-              >
-                {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-                Refinar
-              </Button>
+            {/* Opções avançadas: apenas dimensões, mais discreto */}
+            <div className="mt-4 pt-3 border-t border-border space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Opções avançadas (opcional)</p>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
+                <Select value={refineDimensions} onValueChange={setRefineDimensions}>
+                  <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    {REFINE_DIMENSIONS.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </>
         )}

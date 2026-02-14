@@ -7,6 +7,29 @@ const corsHeaders = {
 };
 
 const PLACEHOLDER_IMAGE = "https://placehold.co/1024x1024/2d1b4e/eee?text=Refinado";
+const STORAGE_BUCKET = "neurodesign";
+
+/** Extrai o path do bucket a partir da URL pública do Storage (ex.: .../object/public/neurodesign/path). */
+function getStoragePathFromPublicUrl(imageUrl: string, supabaseUrl: string): string | null {
+  const base = supabaseUrl.replace(/\/$/, "");
+  const prefix = `${base}/storage/v1/object/public/${STORAGE_BUCKET}/`;
+  if (!imageUrl || !imageUrl.startsWith(prefix)) return null;
+  return imageUrl.slice(prefix.length);
+}
+
+/** Para URLs do nosso Storage, gera URL assinada para o Edge Function e APIs poderem baixar a imagem. */
+async function ensureFetchableUrl(
+  imageUrl: string,
+  supabaseUrl: string,
+  supabase: { storage: { from: (bucket: string) => { createSignedUrl: (path: string, expiresIn: number) => Promise<{ data: { signedUrl: string } | null; error: unknown }> } } }
+): Promise<string> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  const path = getStoragePathFromPublicUrl(imageUrl, supabaseUrl);
+  if (!path) return imageUrl;
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 120);
+  if (error || !data?.signedUrl) return imageUrl;
+  return data.signedUrl;
+}
 
 function getDimensionsFromConfig(dimensions: string | undefined): { width: number; height: number } {
   const d = (dimensions || "1:1").trim();
@@ -258,6 +281,29 @@ serve(async (req) => {
       textPrompt = (textPrompt + ` Important: output the image in ${aspectRatioForPrompt} aspect ratio.`).trim();
     }
 
+    // Resolver URLs do nosso Storage para URLs assinadas, para garantir acesso (evitar 403 / Failed to fetch)
+    const resolvedImageUrls: string[] = [];
+    for (const u of imageUrls) {
+      resolvedImageUrls.push(await ensureFetchableUrl(u, supabaseUrl, supabase));
+    }
+
+    // Validar que imagens enviadas pelo usuário (referência, substituir, adicionar, crop) são acessíveis
+    const userUploadUrls: { url: string; label: string }[] = [];
+    if (referenceImageUrl) userUploadUrls.push({ url: referenceImageUrl, label: "referência de arte" });
+    if (replacementImageUrl) userUploadUrls.push({ url: replacementImageUrl, label: "imagem para substituir" });
+    if (addImageUrl) userUploadUrls.push({ url: addImageUrl, label: "imagem para adicionar na cena" });
+    if (regionCropImageUrl) userUploadUrls.push({ url: regionCropImageUrl, label: "região selecionada" });
+    const resolvedUserUrls = userUploadUrls.map(({ url }) => resolvedImageUrls[imageUrls.indexOf(url)] ?? url);
+    for (let i = 0; i < resolvedUserUrls.length; i++) {
+      const data = await imageUrlToBase64(resolvedUserUrls[i]);
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: `Não foi possível acessar a imagem de ${userUploadUrls[i].label}. Verifique o upload e tente novamente.` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (userAiConnectionId && sourceImageUrl) {
       const { data: conn } = await supabase
         .from("user_ai_connections")
@@ -268,13 +314,13 @@ serve(async (req) => {
         const apiUrl = (conn.api_url || "").toLowerCase();
         try {
           if (apiUrl.includes("openrouter")) {
-            const result = await refineWithOpenRouter(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
+            const result = await refineWithOpenRouter(conn as Conn, resolvedImageUrls, textPrompt, dimensionsForApi);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "openrouter";
             }
           } else if (apiUrl.includes("generativelanguage") || conn.provider?.toLowerCase() === "google") {
-            const result = await refineWithGoogleGemini(conn as Conn, imageUrls, textPrompt, dimensionsForApi);
+            const result = await refineWithGoogleGemini(conn as Conn, resolvedImageUrls, textPrompt, dimensionsForApi);
             if (result) {
               refinedUrl = result.url;
               providerLabel = "google";

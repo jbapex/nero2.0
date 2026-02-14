@@ -252,11 +252,14 @@ const NeuroDesignPage = () => {
     } catch (e) {
       const msg = e?.message || 'Erro desconhecido';
       const is429 = /429|quota|rate limit/i.test(msg);
+      const isNetwork = /failed to fetch|network error|load failed/i.test(msg);
       toast({
         title: 'Erro ao refinar',
         description: is429
           ? 'Limite de uso da API Google (429) atingido. Aguarde alguns minutos ou verifique seu plano em https://ai.google.dev/gemini-api/docs/rate-limits'
-          : msg,
+          : isNetwork
+            ? 'Falha de conexão. Verifique sua internet e se as funções do Supabase estão publicadas e ativas.'
+            : msg,
         variant: 'destructive',
       });
     } finally {
