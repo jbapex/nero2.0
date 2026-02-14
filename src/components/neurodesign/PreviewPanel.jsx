@@ -186,7 +186,8 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     referenceArtFile ||
     replacementFile ||
     addImageFile ||
-    selectionRegion
+    selectionRegion ||
+    (refineDimensions && refineDimensions !== '1:1')
   );
 
   const handleRefineClick = async () => {

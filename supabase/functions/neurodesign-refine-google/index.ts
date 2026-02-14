@@ -113,7 +113,8 @@ serve(async (req) => {
     };
 
     const instructionTrimmed = (instruction ?? "").trim();
-    const hasAnyAction = instructionTrimmed || referenceImageUrl || replacementImageUrl || addImageUrl || region;
+    const dimensionsOverride = (configOverrides?.dimensions as string)?.trim();
+    const hasAnyAction = instructionTrimmed || referenceImageUrl || replacementImageUrl || addImageUrl || region || (dimensionsOverride && dimensionsOverride !== "1:1");
     if (!projectId || !runId || !imageId) {
       return new Response(JSON.stringify({ error: "projectId, runId e imageId são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
