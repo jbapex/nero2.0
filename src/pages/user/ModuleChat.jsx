@@ -4,12 +4,13 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, Loader2, Sparkles, Star, Copy, Link2, Eye, Wand2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ChevronLeft, Loader2, Sparkles, Star, Copy, Link2, Eye, Wand2, FileText, Plus, Edit } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import EditWithAiModal from '@/components/strategic-planner/EditWithAiModal';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 
@@ -25,6 +26,13 @@ const ModuleChat = () => {
   const [filteredCampaigns, setFilteredCampaigns] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [selectedContextClient, setSelectedContextClient] = useState(null);
+  const [contextModalOpen, setContextModalOpen] = useState(false);
+  const [contextDraftName, setContextDraftName] = useState('');
+  const [contextDraftContent, setContextDraftContent] = useState('');
+  const [contextDocuments, setContextDocuments] = useState([]);
+  const [selectedContextValue, setSelectedContextValue] = useState('__none__');
+  const [isSavingContext, setIsSavingContext] = useState(false);
   const [complementaryText, setComplementaryText] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
   const [lastOutput, setLastOutput] = useState(null);
@@ -158,7 +166,7 @@ const ModuleChat = () => {
   }, [module?.llm_integration_id]);
   
   useEffect(() => {
-    if (module?.config?.use_client) fetchClients();
+    if (module) fetchClients();
     if (module?.config?.use_campaign) fetchCampaigns();
   }, [module, fetchClients, fetchCampaigns]);
 
@@ -201,15 +209,71 @@ const ModuleChat = () => {
     }
   };
 
+  const handleSelectContextClient = (value) => {
+    if (!value || value === '__none__') {
+      setSelectedContextClient(null);
+      return;
+    }
+    const client = clients.find(c => c.id === parseInt(value));
+    setSelectedContextClient(client || null);
+  };
+
+  // Cliente cujo contexto é exibido: o selecionado em "Cliente" (se use_client) ou no dropdown de contexto (se não)
+  const clientForContext = module?.config?.use_client ? selectedClient : selectedContextClient;
+
+  const fetchContextDocuments = useCallback(async () => {
+    if (!clientForContext?.id) {
+      setContextDocuments([]);
+      setSelectedContextValue('__none__');
+      return;
+    }
+    const { data, error } = await supabase
+      .from('client_contexts')
+      .select('id, name, content, created_at')
+      .eq('client_id', clientForContext.id)
+      .order('created_at', { ascending: false });
+    if (!error) {
+      const list = data || [];
+      setContextDocuments(list);
+      setSelectedContextValue(list.length > 0 ? '__all__' : '__none__');
+    }
+  }, [clientForContext?.id]);
+
+  useEffect(() => {
+    fetchContextDocuments();
+  }, [fetchContextDocuments]);
+
+  const openContextEditor = () => {
+    if (!clientForContext) return;
+    setContextDraftName('');
+    setContextDraftContent('');
+    setContextModalOpen(true);
+  };
+
+  const saveContextDocument = async () => {
+    if (!clientForContext?.id || !user) return;
+    setIsSavingContext(true);
+    const { data, error } = await supabase
+      .from('client_contexts')
+      .insert({ client_id: clientForContext.id, name: contextDraftName || null, content: contextDraftContent || '' })
+      .select()
+      .single();
+    setIsSavingContext(false);
+    if (error) {
+      toast({ title: 'Erro ao salvar contexto', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Contexto salvo', description: 'Novo documento de contexto adicionado.' });
+    setContextModalOpen(false);
+    setContextDocuments((prev) => [data, ...prev]);
+    setSelectedContextValue(String(data.id));
+  };
+
   const isGenerateButtonDisabled = () => {
     if (isLoading) return true;
-    const { use_client, use_campaign } = module?.config || {};
-    if (use_client && use_campaign) {
-        // Quando ambos são exigidos, ambos devem estar preenchidos
-        return !selectedClient || !selectedCampaign;
-    }
+    const { use_client } = module?.config || {};
+    // Apenas cliente é obrigatório quando use_client; campanha e contexto são opcionais
     if (use_client && !selectedClient) return true;
-    if (use_campaign && !selectedCampaign) return true;
     return false;
   };
 
@@ -283,6 +347,18 @@ const ModuleChat = () => {
             if (module?.name) contextLines.push(`Módulo: ${module.name}`);
             if (selectedClient?.name) contextLines.push(`Cliente: ${selectedClient.name}`);
             if (selectedCampaign?.name) contextLines.push(`Campanha: ${selectedCampaign.name}`);
+            if (clientForContext?.id && selectedContextValue && selectedContextValue !== '__none__') {
+              const contextList =
+                selectedContextValue === '__all__'
+                  ? contextDocuments
+                  : contextDocuments.filter((c) => String(c.id) === selectedContextValue);
+              if (contextList.length) {
+                const contextBlock = contextList
+                  .map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || '')))
+                  .join('\n\n---\n\n');
+                contextLines.push(`Contexto do cliente (${clientForContext.name}):\n${contextBlock}`);
+              }
+            }
             const contextHeader = contextLines.length ? `[CONTEXTO]\n${contextLines.join('\n')}\n\n` : '';
 
             const messages = [];
@@ -436,12 +512,53 @@ const ModuleChat = () => {
                 </div>}
                 
                 {module.config?.use_campaign && <div className="space-y-2">
-                  <Label htmlFor="campaign-select">Campanha</Label>
+                  <Label htmlFor="campaign-select">Campanha (opcional)</Label>
                   <Select onValueChange={handleSelectCampaign} value={selectedCampaign?.id?.toString() || ''} disabled={!filteredCampaigns.length}>
                     <SelectTrigger id="campaign-select" className="w-full"><SelectValue placeholder="Selecione uma campanha..." /></SelectTrigger>
                     <SelectContent>{filteredCampaigns.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>}
+
+                {/* Contexto: quando use_client, usa o cliente já selecionado; senão, dropdown para escolher cliente */}
+                {!module.config?.use_client && clients.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="context-client-select">Cliente (para contexto)</Label>
+                    <Select onValueChange={handleSelectContextClient} value={selectedContextClient?.id?.toString() || '__none__'}>
+                      <SelectTrigger id="context-client-select" className="w-full"><SelectValue placeholder="Selecione um cliente para ver o contexto..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nenhum</SelectItem>
+                        {clients.map(c => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {clientForContext && (
+                  <div className="space-y-2">
+                    <Label htmlFor="context-select" className="flex items-center gap-2"><FileText className="w-4 h-4" /> Contexto (opcional)</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        id="context-select"
+                        value={selectedContextValue}
+                        onValueChange={setSelectedContextValue}
+                        disabled={contextDocuments.length === 0}
+                      >
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Selecione qual contexto usar..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Nenhum</SelectItem>
+                          {contextDocuments.length > 1 && <SelectItem value="__all__">Todos ({contextDocuments.length})</SelectItem>}
+                          {contextDocuments.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.name || 'Sem título'}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" size="sm" onClick={openContextEditor} className="shrink-0">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {suggestedModules.length > 0 && (
                   <div className="space-y-2">
@@ -532,6 +649,45 @@ const ModuleChat = () => {
           <div className="prose prose-sm dark:prose-invert max-w-none p-4 rounded-md bg-muted whitespace-pre-wrap">
             {contentToView}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contextModalOpen} onOpenChange={setContextModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Adicionar documento de contexto</DialogTitle>
+            <DialogDescription>
+              {clientForContext && `Cliente: ${clientForContext.name}. Este texto será usado pela IA ao gerar conteúdo.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 flex flex-col min-h-0 flex-1">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Nome (opcional)</label>
+              <Input
+                value={contextDraftName}
+                onChange={(e) => setContextDraftName(e.target.value)}
+                placeholder="Ex: Briefing 2025, Tom de voz"
+              />
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col">
+              <label className="text-sm font-medium mb-1 block">Conteúdo</label>
+              <Textarea
+                value={contextDraftContent}
+                onChange={(e) => setContextDraftContent(e.target.value)}
+                placeholder="Descreva o contexto: objetivos, tom de voz, referências..."
+                className="flex-1 min-h-[240px] resize-y font-mono text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost">Cancelar</Button>
+            </DialogClose>
+            <Button onClick={saveContextDocument} disabled={isSavingContext}>
+              {isSavingContext && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Salvar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

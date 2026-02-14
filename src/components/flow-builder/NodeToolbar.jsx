@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Target, Bot, MessageSquare, BrainCircuit, FileSearch, Paintbrush, Youtube, SearchCode, Globe, BookOpen } from 'lucide-react';
+import { Users, Target, Bot, MessageSquare, BrainCircuit, FileSearch, Paintbrush, Youtube, SearchCode, Globe, BookOpen, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -11,6 +11,7 @@ const NodeToolbar = ({ addNode, isLoadingData }) => {
             title: 'Nós de Dados',
             nodes: [
                 { type: 'client', label: 'Adicionar Cliente', icon: Users },
+                { type: 'context', label: 'Adicionar Contexto', icon: FileText, iconColor: 'text-violet-500' },
                 { type: 'campaign', label: 'Adicionar Campanha', icon: Target },
                 { type: 'knowledge', label: 'Fonte de Conhecimento', icon: BookOpen, iconColor: 'text-yellow-500' },
             ]

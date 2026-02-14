@@ -94,7 +94,7 @@ const CampaignBuilder = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('campaigns')
-      .select('*, clients(id, name)')
+      .select('*, clients(id, name, client_contexts(name, content))')
       .eq('id', id)
       .eq('user_id', user.id)
       .single();
@@ -303,7 +303,7 @@ const CampaignBuilder = () => {
                     errors={currentStep === 0 ? errors : {}}
                     updateData={updateData} 
                     campaignId={currentCampaignId} 
-                    campaignData={{...campaignData, client_name: client?.name}}
+                    campaignData={{...campaignData, client_name: client?.name, client: client}}
                     applyTemplate={applyTemplate}
                     setClient={setClient}
                     autoSaveStatus={currentCampaignId ? autoSaveStatus : ''}

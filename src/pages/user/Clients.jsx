@@ -150,6 +150,7 @@ const Clients = () => {
             handleCloseDrawer();
           }}
           onGoBack={handleCloseDrawer}
+          onContextSaved={(updatedClient) => setSelectedClient(updatedClient)}
         />
       );
     }

@@ -155,7 +155,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     
           const { data: campaignData, error: campaignError } = await supabase
             .from('campaigns')
-            .select('id, name, clients(name)')
+            .select('id, name, clients(name, client_contexts(name, content))')
             .eq('id', campaignId)
             .eq('user_id', user.id)
             .single();
@@ -253,11 +253,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     
         try {
           // Adicionar contexto da campanha na primeira mensagem do usuário
+          const clientContexts = campaign?.clients?.client_contexts || [];
+          const clientContextBlock = clientContexts.length
+            ? '\n[CONTEXTO DO CLIENTE]\n' + clientContexts.map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || ''))).join('\n\n---\n\n') + '\n[/CONTEXTO DO CLIENTE]'
+            : '';
           const messagesWithContext = newMessages.map((msg, index) => {
             if (index === 0 && msg.role === 'user') {
               return {
                 ...msg,
-                content: `[CONTEXTO DA CAMPANHA: ${campaign?.name}${campaign?.clients?.name ? ` - Cliente: ${campaign.clients.name}` : ''}]\n\n${msg.content}`
+                content: `[CONTEXTO DA CAMPANHA: ${campaign?.name}${campaign?.clients?.name ? ` - Cliente: ${campaign.clients.name}` : ''}${clientContextBlock}]\n\n${msg.content}`
               };
             }
             return msg;

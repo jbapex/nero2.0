@@ -180,7 +180,7 @@ const GenerationStep = ({ campaignData, updateExecutionCount }) => {
     }
     setGenerating(true);
     
-    const clients = campaignData?.clients;
+    const clients = campaignData?.client || campaignData?.clients;
     const payload = campaignData; // enviar campanha completa (inclui clients)
     const agentIdRaw = agent.id.toString().replace('module-', '');
     const selectedIntegration = llmIntegrations.find(i => i.id === selectedLlmId);
@@ -228,7 +228,11 @@ const GenerationStep = ({ campaignData, updateExecutionCount }) => {
         try {
           // Construir prompt com contexto do módulo e campanha
           const modulePrompt = agent.prompt || agent.description || '';
-          const campaignContext = `Campanha: ${payload.name || 'Sem nome'}\nCliente: ${clients?.name || 'N/A'}\nBriefing: ${payload.description || 'N/A'}`;
+          const clientContexts = clients?.client_contexts || [];
+          const clientContextBlock = clientContexts.length
+            ? '\nContexto do cliente:\n' + clientContexts.map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || ''))).join('\n\n---\n\n')
+            : '';
+          const campaignContext = `Campanha: ${payload.name || 'Sem nome'}\nCliente: ${clients?.name || 'N/A'}\nBriefing: ${payload.description || 'N/A'}${clientContextBlock}`;
           const fullPrompt = `${modulePrompt}\n\n${campaignContext}`;
           
           const { data: chatData, error: chatError } = await supabase.functions.invoke('generic-ai-chat', {

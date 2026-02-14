@@ -3,6 +3,7 @@ import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import ClientNode from '@/components/flow-builder/nodes/ClientNode';
+import ContextNode from '@/components/flow-builder/nodes/ContextNode';
 import CampaignNode from '@/components/flow-builder/nodes/CampaignNode';
 import AgentNode from '@/components/flow-builder/nodes/AgentNode';
 import ChatNode from '@/components/flow-builder/nodes/ChatNode';
@@ -26,6 +27,7 @@ const FlowCanvas = ({
 }) => {
     const nodeTypes = useMemo(() => ({
         client: (props) => <ClientNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        context: (props) => <ContextNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         campaign: (props) => <CampaignNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         agent: (props) => <AgentNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         chat: (props) => <ChatNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onRefreshData }} />,

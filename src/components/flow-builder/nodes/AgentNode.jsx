@@ -204,12 +204,20 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
             const selectedModule = modules.find(m => m.id.toString() === selectedModuleId);
             const modulePrompt = selectedModule?.prompt || '';
 
+            // Documentos de contexto: nó Contexto tem prioridade; senão vem do nó Cliente
+            const contextContexts = inputData?.context?.data?.contexts;
+            const clientContexts = inputData?.client?.data?.client_contexts || [];
+            const contextsToUse = (Array.isArray(contextContexts) && contextContexts.length) ? contextContexts : clientContexts;
+            const contextBlock = contextsToUse.length
+              ? contextsToUse.map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || ''))).join('\n\n---\n\n')
+              : '';
+
             // Construct detailed prompt with module context
             const detailedPrompt = `Módulo: ${selectedModule?.name || 'Agente de IA'}
 Prompt do Módulo: ${modulePrompt}
 
-Contexto do Cliente: ${inputData?.client?.data ? JSON.stringify(inputData.client.data, null, 2) : 'N/A'}
-Contexto da Campanha: ${inputData?.campaign?.data ? JSON.stringify(inputData.campaign.data, null, 2) : 'N/A'}
+Contexto do Cliente: ${inputData?.client?.data ? JSON.stringify({ ...inputData.client.data, client_contexts: undefined }, null, 2) : 'N/A'}
+${contextBlock ? `Documentos de Contexto do Cliente:\n${contextBlock}\n\n` : ''}Contexto da Campanha: ${inputData?.campaign?.data ? JSON.stringify(inputData.campaign.data, null, 2) : 'N/A'}
 Fonte de Conhecimento: ${inputData?.knowledge?.data ? JSON.stringify(inputData.knowledge.data, null, 2) : 'N/A'}
 
 Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.generatedText}\n\nInstrução: ${refinePrompt}` : userTextForFunction}`;

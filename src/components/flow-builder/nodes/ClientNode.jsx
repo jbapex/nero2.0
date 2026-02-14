@@ -1,19 +1,52 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users } from 'lucide-react';
+import { supabase } from '@/lib/customSupabaseClient';
 
 const ClientNode = memo(({ data, id }) => {
   const { onUpdateNodeData, clients, selectedClientId } = data;
 
-  const handleClientChange = (clientId) => {
+  // Ao carregar o fluxo com cliente já selecionado, buscar client_contexts
+  useEffect(() => {
+    if (!selectedClientId || !clients?.length || !onUpdateNodeData) return;
+    const selectedClientData = clients.find(c => c.id.toString() === selectedClientId);
+    if (!selectedClientData) return;
+    let cancelled = false;
+    (async () => {
+      const { data: contexts } = await supabase
+        .from('client_contexts')
+        .select('id, name, content')
+        .eq('client_id', selectedClientData.id)
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      onUpdateNodeData(id, {
+        output: {
+          id: selectedClientId,
+          data: { ...selectedClientData, client_contexts: contexts || [] }
+        }
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [selectedClientId, clients, id, onUpdateNodeData]);
+
+  const handleClientChange = async (clientId) => {
     const selectedClientData = clients.find(c => c.id.toString() === clientId);
+    if (!selectedClientData) {
+      onUpdateNodeData(id, { selectedClientId: null, output: null });
+      return;
+    }
+    const { data: contexts } = await supabase
+      .from('client_contexts')
+      .select('id, name, content')
+      .eq('client_id', selectedClientData.id)
+      .order('created_at', { ascending: true });
     onUpdateNodeData(id, { 
       selectedClientId: clientId, 
       output: { 
         id: clientId,
-        data: selectedClientData 
+        data: { ...selectedClientData, client_contexts: contexts || [] }
       }
     });
   };

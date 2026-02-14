@@ -140,6 +140,9 @@ export const useFlowState = (flowData) => {
             case 'client':
                 nodeData.clients = clients;
                 break;
+            case 'context':
+                nodeData.clients = clients;
+                break;
             case 'campaign':
                 nodeData.campaigns = campaigns;
                 break;
@@ -173,6 +176,9 @@ export const useFlowState = (flowData) => {
                 let specificData = {};
                 switch (node.type) {
                     case 'client':
+                        specificData = { clients };
+                        break;
+                    case 'context':
                         specificData = { clients };
                         break;
                     case 'campaign':
