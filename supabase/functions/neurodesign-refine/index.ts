@@ -170,6 +170,8 @@ serve(async (req) => {
       addImageUrl,
       region,
       regionCropImageUrl,
+      selectionAction,
+      selectionText,
     } = body as {
       projectId: string;
       runId: string;
@@ -182,11 +184,22 @@ serve(async (req) => {
       addImageUrl?: string;
       region?: { x: number; y: number; width: number; height: number };
       regionCropImageUrl?: string;
+      selectionAction?: string;
+      selectionText?: string;
     };
 
     const instructionTrimmed = (instruction ?? "").trim();
+    const selectionTextTrimmed = (selectionText ?? "").trim();
     const dimensionsOverride = (configOverrides?.dimensions as string)?.trim();
-    const hasAnyAction = instructionTrimmed || referenceImageUrl || replacementImageUrl || addImageUrl || region || (dimensionsOverride && dimensionsOverride !== "1:1");
+    const hasSelectionAction = region && regionCropImageUrl && selectionAction;
+    const hasAnyAction =
+      hasSelectionAction ||
+      instructionTrimmed ||
+      referenceImageUrl ||
+      replacementImageUrl ||
+      addImageUrl ||
+      region ||
+      (dimensionsOverride && dimensionsOverride !== "1:1");
     if (!projectId || !runId || !imageId) {
       return new Response(JSON.stringify({ error: "projectId, runId e imageId são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -231,6 +244,8 @@ serve(async (req) => {
         addImageUrl: addImageUrl ?? null,
         region: region ?? null,
         regionCropImageUrl: regionCropImageUrl ?? null,
+        selectionAction: selectionAction ?? null,
+        selectionText: selectionTextTrimmed || null,
       },
     };
     const { data: run, error: runError } = await supabase.from("neurodesign_generation_runs").insert(runInsert).select("id").single();
@@ -244,7 +259,49 @@ serve(async (req) => {
     const imageUrls: string[] = [sourceImageUrl];
     let textPrompt: string;
 
-    if (referenceImageUrl && !replacementImageUrl) {
+    if (region && regionCropImageUrl && selectionAction) {
+      switch (selectionAction) {
+        case "add_text":
+          if (selectionTextTrimmed) {
+            imageUrls.push(regionCropImageUrl);
+            textPrompt = `In the first image, add the following text inside or at the selected region (the second image shows the exact area). Text to add: "${selectionTextTrimmed}". Make the text look integrated and professional with the scene. Do not change the rest of the image.`;
+          } else {
+            imageUrls.push(regionCropImageUrl);
+            textPrompt = instructionTrimmed
+              ? `Apply this change only to the selected region (second image) of the first image. Keep the rest unchanged. ${instructionTrimmed}`
+              : "Apply minimal adjustments to the selected region only. Keep the rest of the image unchanged.";
+          }
+          break;
+        case "remove_text":
+          imageUrls.push(regionCropImageUrl);
+          textPrompt = "In the first image, remove only the text or text-like content that appears in the selected region (shown in the second image). Leave the rest of the image completely unchanged. Fill or blend the area where text was removed so it looks natural.";
+          break;
+        case "remove_content":
+          imageUrls.push(regionCropImageUrl);
+          textPrompt = "In the first image, remove all content inside the selected region (shown in the second image). Fill that area naturally so it blends with the surrounding background. Do not change anything outside the selected region.";
+          break;
+        case "replace":
+          if (replacementImageUrl) {
+            imageUrls.push(regionCropImageUrl, replacementImageUrl);
+            textPrompt = instructionTrimmed
+              ? `In the first image, replace the region that corresponds to the content shown in the second image (the selected crop) with the content of the third image. Keep the rest of the first image unchanged. ${instructionTrimmed}`
+              : "In the first image, replace the region that corresponds to the content shown in the second image (the selected crop) with the content of the third image. Keep the rest of the first image unchanged.";
+          } else {
+            imageUrls.push(regionCropImageUrl);
+            textPrompt = instructionTrimmed
+              ? `Apply this change only to the selected region (second image) of the first image. ${instructionTrimmed}`
+              : "Apply minimal adjustments to the selected region only. Keep the rest of the image unchanged.";
+          }
+          break;
+        case "free":
+        default:
+          imageUrls.push(regionCropImageUrl);
+          textPrompt = instructionTrimmed
+            ? `In the first image, apply the following change only to the selected region (shown in the second image). Leave the rest of the image unchanged. Instruction: ${instructionTrimmed}`
+            : "Apply minimal adjustments to the selected region only. Keep the rest of the image unchanged.";
+          break;
+      }
+    } else if (referenceImageUrl && !replacementImageUrl) {
       imageUrls.push(referenceImageUrl);
       textPrompt = instructionTrimmed
         ? `Apply the visual style of the second image (reference art) to the first image. Keep the same composition and subject of the first image, but make it look similar to the reference. Additional instruction: ${instructionTrimmed}`

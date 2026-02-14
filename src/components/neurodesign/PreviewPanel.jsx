@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Loader2, Download, Sparkles, Upload, X, Crop, Maximize2 } from 'lucide-react';
+import { Loader2, Download, Sparkles, Upload, X, Crop, Maximize2, Type, Eraser, ImageMinus, ImageIcon, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
@@ -18,6 +18,14 @@ const REFINE_DIMENSIONS = [
   { value: '16:9', label: '16:9 Horizontal' },
 ];
 
+const SELECTION_ACTIONS = [
+  { value: 'add_text', label: 'Adicionar texto aqui', icon: Type },
+  { value: 'remove_text', label: 'Remover texto só nesta área', icon: Eraser },
+  { value: 'remove_content', label: 'Remover conteúdo desta área', icon: ImageMinus },
+  { value: 'replace', label: 'Substituir por imagem', icon: ImageIcon },
+  { value: 'free', label: 'Instrução livre', icon: MessageSquare },
+];
+
 const isDemoPlaceholder = (url) => url && typeof url === 'string' && url.includes('placehold.co');
 
 const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage }) => {
@@ -29,6 +37,8 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const [replacementFile, setReplacementFile] = useState(null);
   const [replacementPreviewUrl, setReplacementPreviewUrl] = useState('');
   const [selectionRegion, setSelectionRegion] = useState(null);
+  const [selectionAction, setSelectionAction] = useState('free');
+  const [selectionText, setSelectionText] = useState('');
   const [isUploadingRefine, setIsUploadingRefine] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState(null);
@@ -36,6 +46,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const previewContainerRef = useRef(null);
   const previewImgRef = useRef(null);
   const instructionInputRef = useRef(null);
+  const selectionActionBlockRef = useRef(null);
   const referenceArtInputRef = useRef(null);
   const replacementInputRef = useRef(null);
   const addImageInputRef = useRef(null);
@@ -178,23 +189,29 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     if (region) {
       setSelectionRegion(region);
       requestAnimationFrame(() => {
-        instructionInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        instructionInputRef.current?.focus();
+        selectionActionBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     }
   };
 
   const clearSelection = () => {
     setSelectionRegion(null);
+    setSelectionAction('free');
+    setSelectionText('');
+  };
+
+  const hasSelectionActionValid = () => {
+    if (!selectionRegion) return false;
+    if (selectionAction === 'add_text') return selectionText.trim().length > 0;
+    if (selectionAction === 'remove_text' || selectionAction === 'remove_content') return true;
+    if (selectionAction === 'replace') return !!replacementFile;
+    if (selectionAction === 'free') return refineInstruction.trim().length > 0 || referenceArtFile || replacementFile || addImageFile;
+    return false;
   };
 
   const hasAnyRefineAction = !!(
-    refineInstruction.trim() ||
-    referenceArtFile ||
-    replacementFile ||
-    addImageFile ||
-    selectionRegion ||
-    (refineDimensions && refineDimensions !== '1:1')
+    (refineDimensions && refineDimensions !== '1:1') ||
+    (selectionRegion ? hasSelectionActionValid() : (refineInstruction.trim() || referenceArtFile || replacementFile || addImageFile))
   );
 
   const handleRefineClick = async () => {
@@ -237,9 +254,12 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
         ...(addImageUrl && { addImageUrl }),
         ...(region && { region }),
         ...(regionCropImageUrl && { regionCropImageUrl }),
+        ...(region && { selectionAction }),
+        ...(region && selectionAction === 'add_text' && selectionText.trim() && { selectionText: selectionText.trim() }),
       };
       onRefine?.(payload);
       setRefineInstruction('');
+      setSelectionText('');
       clearReferenceArt();
       clearReplacement();
       clearAddImage();
@@ -358,18 +378,94 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         {!isLoading && imageUrl && (
           <>
-            {/* Bloco principal: O que você quer fazer? */}
-            <div className="mt-4 space-y-3" role="region" aria-label="Refinamento">
-              <p className="text-sm font-medium text-foreground">O que você quer fazer?</p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Textarea
-                  ref={instructionInputRef}
-                  placeholder="Descreva o ajuste (ex.: deixe o fundo mais escuro) ou use uma imagem abaixo."
-                  value={refineInstruction}
-                  onChange={(e) => setRefineInstruction(e.target.value)}
-                  className="flex-1 min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none min-w-0"
-                  aria-label="Instrução de refinamento: descreva o ajuste ou use uma imagem abaixo"
-                />
+            {selectionRegion ? (
+              /* Bloco quando há seleção: O que fazer nesta seleção? */
+              <div ref={selectionActionBlockRef} className="mt-4 space-y-3" role="region" aria-label="Ação na seleção">
+                <p className="text-sm font-medium text-foreground">O que fazer nesta seleção?</p>
+                <div className="flex flex-wrap gap-2">
+                  {SELECTION_ACTIONS.map(({ value, label, icon: Icon }) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={selectionAction === value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectionAction(value)}
+                      className="shrink-0"
+                      aria-label={label}
+                      aria-pressed={selectionAction === value}
+                    >
+                      <Icon className="h-3.5 w-3.5 mr-1.5" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                {selectionAction === 'add_text' && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground block">Texto a aparecer na região</label>
+                    <input
+                      type="text"
+                      placeholder="Ex.: PLANNING 2025, slogan…"
+                      value={selectionText}
+                      onChange={(e) => setSelectionText(e.target.value)}
+                      className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="Texto a inserir na região selecionada"
+                    />
+                  </div>
+                )}
+                {selectionAction === 'remove_text' && (
+                  <p className="text-xs text-muted-foreground">O texto visível na área selecionada será removido; o resto da imagem permanece.</p>
+                )}
+                {selectionAction === 'remove_content' && (
+                  <p className="text-xs text-muted-foreground">O conteúdo da área selecionada será removido e preenchido de forma natural.</p>
+                )}
+                {selectionAction === 'replace' && (
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Imagem para substituir esta área</label>
+                    <div className="flex items-center gap-2">
+                      {replacementPreviewUrl ? (
+                        <div className="relative">
+                          <img src={replacementPreviewUrl} alt="Substituir" className="w-14 h-14 rounded object-cover border border-border" />
+                          <button type="button" onClick={clearReplacement} className="absolute -top-1 -right-1 bg-foreground/80 text-background rounded-full p-0.5">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => replacementInputRef.current?.click()}
+                            className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0"
+                            aria-label="Enviar imagem para substituir"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </button>
+                          <input
+                            ref={replacementInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            aria-hidden
+                            onChange={handleReplacementChange}
+                          />
+                        </>
+                      )}
+                      <span className="text-xs text-muted-foreground">Substitua a área selecionada por esta imagem</span>
+                    </div>
+                  </div>
+                )}
+                {selectionAction === 'free' && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground block">Instrução para a região selecionada</label>
+                    <Textarea
+                      ref={instructionInputRef}
+                      placeholder="Descreva o ajuste na região (ex.: escureça, mude a cor…)"
+                      value={refineInstruction}
+                      onChange={(e) => setRefineInstruction(e.target.value)}
+                      className="min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none w-full"
+                      aria-label="Instrução de refinamento na região selecionada"
+                    />
+                  </div>
+                )}
                 <Button
                   onClick={handleRefineClick}
                   disabled={!hasAnyRefineAction || isUploadingRefine}
@@ -379,8 +475,30 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   Refinar
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Ou envie uma imagem:</p>
-              <div className="flex flex-wrap gap-4">
+            ) : (
+              /* Bloco sem seleção: O que você quer fazer? */
+              <div className="mt-4 space-y-3" role="region" aria-label="Refinamento">
+                <p className="text-sm font-medium text-foreground">O que você quer fazer?</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Textarea
+                    ref={instructionInputRef}
+                    placeholder="Descreva o ajuste (ex.: deixe o fundo mais escuro) ou use uma imagem abaixo."
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    className="flex-1 min-h-[60px] bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none min-w-0"
+                    aria-label="Instrução de refinamento: descreva o ajuste ou use uma imagem abaixo"
+                  />
+                  <Button
+                    onClick={handleRefineClick}
+                    disabled={!hasAnyRefineAction || isUploadingRefine}
+                    className="shrink-0"
+                  >
+                    {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                    Refinar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Ou envie uma imagem:</p>
+                <div className="flex flex-wrap gap-4">
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">Referência de arte</label>
                   <div className="flex items-center gap-2">
@@ -482,6 +600,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 </div>
               </div>
             </div>
+            )}
 
             {/* Opções avançadas: apenas dimensões, mais discreto */}
             <div className="mt-4 pt-3 border-t border-border space-y-2">
