@@ -216,6 +216,8 @@ const NeuroDesignPage = () => {
     const regionCropImageUrl = typeof payload === 'object' && payload !== null ? payload.regionCropImageUrl : undefined;
     const selectionAction = typeof payload === 'object' && payload !== null ? payload.selectionAction : undefined;
     const selectionText = typeof payload === 'object' && payload !== null ? payload.selectionText : undefined;
+    const selectionFont = typeof payload === 'object' && payload !== null ? payload.selectionFont : undefined;
+    const selectionFontStyle = typeof payload === 'object' && payload !== null ? payload.selectionFontStyle : undefined;
 
     refiningRef.current = true;
     setIsRefining(true);
@@ -235,6 +237,8 @@ const NeuroDesignPage = () => {
       if (regionCropImageUrl) body.regionCropImageUrl = regionCropImageUrl;
       if (selectionAction) body.selectionAction = selectionAction;
       if (selectionText) body.selectionText = selectionText;
+      if (selectionFont) body.selectionFont = selectionFont;
+      if (selectionFontStyle) body.selectionFontStyle = selectionFontStyle;
 
       const refineConn = imageConnections.find((c) => c.id === currentConfig?.user_ai_connection_id);
       const isGoogleRefine = refineConn?.provider?.toLowerCase() === 'google';

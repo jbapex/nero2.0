@@ -132,6 +132,8 @@ serve(async (req) => {
       regionCropImageUrl,
       selectionAction,
       selectionText,
+      selectionFont,
+      selectionFontStyle,
     } = body as {
       projectId: string;
       runId: string;
@@ -146,6 +148,8 @@ serve(async (req) => {
       regionCropImageUrl?: string;
       selectionAction?: string;
       selectionText?: string;
+      selectionFont?: string;
+      selectionFontStyle?: string;
     };
 
     const instructionTrimmed = (instruction ?? "").trim();
@@ -219,6 +223,8 @@ serve(async (req) => {
         regionCropImageUrl: regionCropImageUrl ?? null,
         selectionAction: selectionAction ?? null,
         selectionText: selectionTextTrimmed || null,
+        selectionFont: (selectionFont ?? "").trim() || null,
+        selectionFontStyle: (selectionFontStyle ?? "").trim() || null,
       },
     };
     const { data: run, error: runError } = await supabase.from("neurodesign_generation_runs").insert(runInsert).select("id").single();
@@ -232,17 +238,32 @@ serve(async (req) => {
 
     if (region && regionCropImageUrl && selectionAction) {
       switch (selectionAction) {
-        case "add_text":
+        case "add_text": {
+          imageUrls.push(regionCropImageUrl);
+          const fontName = (selectionFont ?? "").trim();
+          const fontStyleRaw = (selectionFontStyle ?? "").trim().toLowerCase();
+          const fontStyleMap: Record<string, string> = {
+            elegante: "elegant",
+            moderno: "modern",
+            negrito: "bold",
+            script: "script or cursive",
+            minimalista: "minimalist",
+            retro: "retro/vintage",
+            corporate: "corporate/professional",
+          };
+          const fontStyleEn = fontStyleRaw && fontStyleMap[fontStyleRaw] ? fontStyleMap[fontStyleRaw] : "";
+          let typographyHint = "";
+          if (fontName) typographyHint += ` Use the font named "${fontName}" or a very similar one.`;
+          if (fontStyleEn) typographyHint += ` The typography should be ${fontStyleEn} style.`;
           if (selectionTextTrimmed) {
-            imageUrls.push(regionCropImageUrl);
-            textPrompt = `In the first image, add the following text inside or at the selected region (the second image shows the exact area). Text to add: "${selectionTextTrimmed}". Make the text look integrated and professional with the scene. Do not change the rest of the image.`;
+            textPrompt = `In the first image, add the following text inside or at the selected region (the second image shows the exact area). Text to add: "${selectionTextTrimmed}". Make the text look integrated and professional with the scene.${typographyHint} Do not change the rest of the image.`;
           } else {
-            imageUrls.push(regionCropImageUrl);
             textPrompt = instructionTrimmed
               ? `Apply this change only to the selected region (second image) of the first image. Keep the rest unchanged. ${instructionTrimmed}`
               : "Apply minimal adjustments to the selected region only. Keep the rest of the image unchanged.";
           }
           break;
+        }
         case "remove_text":
           imageUrls.push(regionCropImageUrl);
           textPrompt = "In the first image, remove only the text or text-like content that appears in the selected region (shown in the second image). Leave the rest of the image completely unchanged. Fill or blend the area where text was removed so it looks natural.";

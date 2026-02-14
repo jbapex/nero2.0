@@ -26,6 +26,17 @@ const SELECTION_ACTIONS = [
   { value: 'free', label: 'Instrução livre', icon: MessageSquare },
 ];
 
+const SELECTION_FONT_STYLES = [
+  { value: 'none', label: 'Deixar modelo escolher' },
+  { value: 'elegante', label: 'Elegante' },
+  { value: 'moderno', label: 'Moderno' },
+  { value: 'negrito', label: 'Negrito' },
+  { value: 'script', label: 'Script / Cursiva' },
+  { value: 'minimalista', label: 'Minimalista' },
+  { value: 'retro', label: 'Retrô' },
+  { value: 'corporate', label: 'Corporativo' },
+];
+
 const isDemoPlaceholder = (url) => url && typeof url === 'string' && url.includes('placehold.co');
 
 const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage }) => {
@@ -39,6 +50,8 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const [selectionRegion, setSelectionRegion] = useState(null);
   const [selectionAction, setSelectionAction] = useState('free');
   const [selectionText, setSelectionText] = useState('');
+  const [selectionFont, setSelectionFont] = useState('');
+  const [selectionFontStyle, setSelectionFontStyle] = useState('');
   const [isUploadingRefine, setIsUploadingRefine] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState(null);
@@ -198,6 +211,8 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     setSelectionRegion(null);
     setSelectionAction('free');
     setSelectionText('');
+    setSelectionFont('');
+    setSelectionFontStyle('');
   };
 
   const hasSelectionActionValid = () => {
@@ -256,6 +271,8 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
         ...(regionCropImageUrl && { regionCropImageUrl }),
         ...(region && { selectionAction }),
         ...(region && selectionAction === 'add_text' && selectionText.trim() && { selectionText: selectionText.trim() }),
+        ...(region && selectionAction === 'add_text' && selectionFont.trim() && { selectionFont: selectionFont.trim() }),
+        ...(region && selectionAction === 'add_text' && selectionFontStyle && selectionFontStyle !== 'none' && { selectionFontStyle }),
       };
       onRefine?.(payload);
       setRefineInstruction('');
@@ -400,16 +417,42 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   ))}
                 </div>
                 {selectionAction === 'add_text' && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground block">Texto a aparecer na região</label>
-                    <input
-                      type="text"
-                      placeholder="Ex.: PLANNING 2025, slogan…"
-                      value={selectionText}
-                      onChange={(e) => setSelectionText(e.target.value)}
-                      className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label="Texto a inserir na região selecionada"
-                    />
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground block">Texto a aparecer na região</label>
+                      <input
+                        type="text"
+                        placeholder="Ex.: PLANNING 2025, slogan…"
+                        value={selectionText}
+                        onChange={(e) => setSelectionText(e.target.value)}
+                        className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="Texto a inserir na região selecionada"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground block">Fonte (opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex.: Montserrat, Inter, Arial"
+                        value={selectionFont}
+                        onChange={(e) => setSelectionFont(e.target.value)}
+                        className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="Nome da fonte (opcional)"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground block">Estilo da fonte (opcional, se não escolher fonte específica)</label>
+                      <Select value={selectionFontStyle || 'none'} onValueChange={(v) => setSelectionFontStyle(v === 'none' ? '' : v)}>
+                        <SelectTrigger className="w-full max-w-[280px] h-9 bg-muted border-border text-foreground text-sm">
+                          <SelectValue placeholder="Deixar modelo escolher" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover text-popover-foreground">
+                          {SELECTION_FONT_STYLES.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 )}
                 {selectionAction === 'remove_text' && (
