@@ -64,8 +64,8 @@ import React from 'react';
     
       if (loading && !isAuthRoute && !isPublicRoute) {
         return (
-          <div className="flex items-center justify-center h-screen bg-background">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center h-screen bg-background" style={{ background: 'var(--background, #111827)', minHeight: '100dvh' }}>
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--primary, #6366f1)', borderTopColor: 'transparent' }} />
           </div>
         );
       }

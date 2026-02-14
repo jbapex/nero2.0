@@ -19,9 +19,8 @@ import NeuroDesignErrorBoundary from '@/components/neurodesign/NeuroDesignErrorB
 const NeuroDesignPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [view, setView] = useState('explore');
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [view, setView] = useState('create');
+  const [project, setProject] = useState(null);
   const [currentConfig, setCurrentConfig] = useState(null);
   const [runs, setRuns] = useState([]);
   const [images, setImages] = useState([]);
@@ -38,23 +37,36 @@ const NeuroDesignPage = () => {
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
   const [builderDrawerOpen, setBuilderDrawerOpen] = useState(false);
 
-  const fetchProjects = useCallback(async () => {
+  const getOrCreateProject = useCallback(async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('neurodesign_projects')
         .select('*')
         .eq('owner_user_id', user.id)
-        .order('updated_at', { ascending: false });
-      if (error) {
-        toast({ title: 'Erro ao carregar projetos', description: error.message, variant: 'destructive' });
-        setProjects([]);
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fetchError) {
+        toast({ title: 'Erro ao carregar projeto', description: fetchError.message, variant: 'destructive' });
         return;
       }
-      setProjects(data || []);
+      if (existing) {
+        setProject(existing);
+        return;
+      }
+      const { data: created, error: insertError } = await supabase
+        .from('neurodesign_projects')
+        .insert({ name: 'Meu projeto', owner_user_id: user.id })
+        .select()
+        .single();
+      if (insertError) {
+        toast({ title: 'Erro ao criar projeto', description: insertError.message, variant: 'destructive' });
+        return;
+      }
+      setProject(created);
     } catch (e) {
-      toast({ title: 'Erro ao carregar projetos', description: e?.message || 'Tabela pode não existir. Execute o SQL do NeuroDesign no Supabase.', variant: 'destructive' });
-      setProjects([]);
+      toast({ title: 'Erro ao carregar projeto', description: e?.message || 'Tabela pode não existir. Execute o SQL do NeuroDesign no Supabase.', variant: 'destructive' });
     }
   }, [user, toast]);
 
@@ -116,29 +128,29 @@ const NeuroDesignPage = () => {
   }, [toast]);
 
   useEffect(() => {
-    fetchProjects();
+    getOrCreateProject();
     fetchImageConnections();
     fetchLlmConnections();
-  }, [fetchProjects, fetchImageConnections, fetchLlmConnections]);
+  }, [getOrCreateProject, fetchImageConnections, fetchLlmConnections]);
 
   useEffect(() => {
-    if (selectedProject) {
+    if (project) {
       setCurrentConfig(null);
       setSelectedImage(null);
-      fetchRuns(selectedProject.id);
-      fetchImages(selectedProject.id);
+      fetchRuns(project.id);
+      fetchImages(project.id);
     } else {
       setRuns([]);
       setImages([]);
       setCurrentConfig(null);
       setSelectedImage(null);
     }
-  }, [selectedProject, fetchRuns, fetchImages]);
+  }, [project, fetchRuns, fetchImages]);
 
   const handleGenerate = async (config) => {
     if (generatingRef.current) return;
-    if (!selectedProject) {
-      toast({ title: 'Selecione um projeto', variant: 'destructive' });
+    if (!project) {
+      toast({ title: 'Projeto ainda não carregou', variant: 'destructive' });
       return;
     }
     generatingRef.current = true;
@@ -149,7 +161,7 @@ const NeuroDesignPage = () => {
       const fnName = isGoogle ? 'neurodesign-generate-google' : 'neurodesign-generate';
       const { data, error } = await supabase.functions.invoke(fnName, {
         body: {
-          projectId: selectedProject.id,
+          projectId: project.id,
           configId: config?.id || null,
           config,
           userAiConnectionId: config?.user_ai_connection_id || null,
@@ -160,11 +172,11 @@ const NeuroDesignPage = () => {
       if (data?.error) throw new Error(data.error);
       const newImages = data?.images;
       if (newImages?.length) {
-        const withIds = newImages.map((img, i) => ({ ...img, id: img.id || `temp-${i}`, run_id: img.run_id || data.runId, project_id: selectedProject.id }));
+        const withIds = newImages.map((img, i) => ({ ...img, id: img.id || `temp-${i}`, run_id: img.run_id || data.runId, project_id: project.id }));
         setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
         setSelectedImage(withIds[0]);
         toast({ title: 'Imagens geradas com sucesso!' });
-        Promise.all([fetchRuns(selectedProject.id), fetchImages(selectedProject.id)]).catch(() => {});
+        Promise.all([fetchRuns(project.id), fetchImages(project.id)]).catch(() => {});
       } else {
         toast({ title: 'Geração concluída', description: `Nenhuma imagem retornada. Verifique se a Edge Function ${fnName} está publicada no Supabase.`, variant: 'destructive' });
       }
@@ -186,7 +198,7 @@ const NeuroDesignPage = () => {
 
   const handleRefine = async (payload) => {
     if (refiningRef.current) return;
-    if (!selectedProject || !selectedImage?.id) {
+    if (!project || !selectedImage?.id) {
       toast({ title: 'Selecione uma imagem para refinar', variant: 'destructive' });
       return;
     }
@@ -199,6 +211,7 @@ const NeuroDesignPage = () => {
     const configOverrides = typeof payload === 'object' && payload !== null ? payload.configOverrides : undefined;
     const referenceImageUrl = typeof payload === 'object' && payload !== null ? payload.referenceImageUrl : undefined;
     const replacementImageUrl = typeof payload === 'object' && payload !== null ? payload.replacementImageUrl : undefined;
+    const addImageUrl = typeof payload === 'object' && payload !== null ? payload.addImageUrl : undefined;
     const region = typeof payload === 'object' && payload !== null ? payload.region : undefined;
     const regionCropImageUrl = typeof payload === 'object' && payload !== null ? payload.regionCropImageUrl : undefined;
 
@@ -206,7 +219,7 @@ const NeuroDesignPage = () => {
     setIsRefining(true);
     try {
       const body = {
-        projectId: selectedProject.id,
+        projectId: project.id,
         runId,
         imageId: selectedImage.id,
         instruction,
@@ -215,6 +228,7 @@ const NeuroDesignPage = () => {
       };
       if (referenceImageUrl) body.referenceImageUrl = referenceImageUrl;
       if (replacementImageUrl) body.replacementImageUrl = replacementImageUrl;
+      if (addImageUrl) body.addImageUrl = addImageUrl;
       if (region) body.region = region;
       if (regionCropImageUrl) body.regionCropImageUrl = regionCropImageUrl;
 
@@ -224,13 +238,14 @@ const NeuroDesignPage = () => {
       const { data, error } = await supabase.functions.invoke(refineFnName, {
         body,
       });
-      const refineErrMsg = data?.error || error?.message;
+      const serverMsg = typeof data?.error === 'string' ? data.error : null;
+      const refineErrMsg = serverMsg || error?.message;
       if (error) throw new Error(refineErrMsg || 'Falha ao chamar o servidor de refino.');
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(serverMsg || 'Falha ao chamar o servidor de refino.');
       if (data?.images?.length) {
-        await fetchImages(selectedProject.id);
-        await fetchRuns(selectedProject.id);
-        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', selectedProject.id).order('created_at', { ascending: false }).range(0, 4);
+        await fetchImages(project.id);
+        await fetchRuns(project.id);
+        const { data: imgList } = await supabase.from('neurodesign_generated_images').select('*').eq('project_id', project.id).order('created_at', { ascending: false }).range(0, 4);
         if (imgList?.length) setSelectedImage(imgList[0]);
         toast({ title: 'Imagem refinada com sucesso!' });
       }
@@ -370,6 +385,42 @@ Regras:
     a.click();
   };
 
+  const handleRenameProject = async (projectIdToRename, newName) => {
+    const trimmed = newName?.trim();
+    if (!trimmed || !project?.id || project.id !== projectIdToRename) return;
+    const { error } = await supabase
+      .from('neurodesign_projects')
+      .update({ name: trimmed })
+      .eq('id', projectIdToRename)
+      .eq('owner_user_id', user.id);
+    if (error) {
+      toast({ title: 'Erro ao renomear', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setProject((prev) => (prev ? { ...prev, name: trimmed } : null));
+    toast({ title: 'Nome atualizado' });
+  };
+
+  const handleDeleteProject = async (projectIdToDelete) => {
+    if (!project?.id || project.id !== projectIdToDelete || !user) return;
+    const { error } = await supabase
+      .from('neurodesign_projects')
+      .delete()
+      .eq('id', projectIdToDelete)
+      .eq('owner_user_id', user.id);
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setProject(null);
+    setRuns([]);
+    setImages([]);
+    setSelectedImage(null);
+    setCurrentConfig(null);
+    await getOrCreateProject();
+    toast({ title: 'Projeto excluído', description: 'Um novo projeto foi criado.' });
+  };
+
   return (
     <>
       <Helmet>
@@ -382,10 +433,12 @@ Regras:
           <NeuroDesignSidebar
             view={view}
             setView={setView}
-            projects={projects}
-            selectedProject={selectedProject}
-            setSelectedProject={setSelectedProject}
-            onRefreshProjects={fetchProjects}
+            projectId={project?.id}
+            projectName={project?.name}
+            onRenameProject={handleRenameProject}
+            onDeleteProject={handleDeleteProject}
+            onCloseDrawer={undefined}
+            wrapperClassName={undefined}
           />
         )}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden min-h-0">
@@ -398,7 +451,7 @@ Regras:
                 onClick={() => setSidebarDrawerOpen(true)}
               >
                 <FolderOpen className="h-4 w-4 mr-1" />
-                Projetos
+                Navegação
               </Button>
               {view === 'create' && (
                 <Button
@@ -418,7 +471,7 @@ Regras:
               {isLg && (
                 <div className="w-[420px] xl:w-[480px] shrink-0 overflow-y-auto border-r border-border bg-card min-h-0">
                   <BuilderPanel
-                    project={selectedProject}
+                    project={project}
                     config={currentConfig}
                     setConfig={setCurrentConfig}
                     imageConnections={imageConnections}
@@ -432,7 +485,7 @@ Regras:
               )}
               <div className="flex-1 min-w-0 flex flex-col">
                 <PreviewPanel
-                  project={selectedProject}
+                  project={project}
                   user={user}
                   selectedImage={selectedImage}
                   images={images}
@@ -449,22 +502,17 @@ Regras:
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
               <MasonryGallery
                 images={images}
-                projectId={selectedProject?.id}
+                projectId={project?.id}
                 selectedIds={selectedImage ? [selectedImage.id] : []}
                 onSelectImage={setSelectedImage}
                 onDownload={downloadHandler}
               />
             </div>
           )}
-          {view === 'explore' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex items-center justify-center text-muted-foreground min-h-0">
-              <p className="text-center">Selecione um projeto na barra lateral ou crie um novo e use &quot;Criar&quot; para começar.</p>
-            </div>
-          )}
         </main>
       </div>
 
-      {/* Drawer Projetos (mobile/tablet) */}
+      {/* Drawer Navegação (mobile/tablet) */}
       <Dialog open={sidebarDrawerOpen} onOpenChange={setSidebarDrawerOpen}>
         <DialogContent
           className="fixed left-0 top-0 h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 rounded-none border-r border-border p-0 gap-0 flex flex-col bg-card data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left"
@@ -473,10 +521,10 @@ Regras:
           <NeuroDesignSidebar
             view={view}
             setView={setView}
-            projects={projects}
-            selectedProject={selectedProject}
-            setSelectedProject={setSelectedProject}
-            onRefreshProjects={fetchProjects}
+            projectId={project?.id}
+            projectName={project?.name}
+            onRenameProject={handleRenameProject}
+            onDeleteProject={handleDeleteProject}
             onCloseDrawer={() => setSidebarDrawerOpen(false)}
             wrapperClassName="w-full h-full border-0 bg-transparent flex flex-col"
           />
@@ -494,11 +542,11 @@ Regras:
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
             <BuilderPanel
-              project={selectedProject}
-              config={currentConfig}
-              setConfig={setCurrentConfig}
-              imageConnections={imageConnections}
-              onGenerate={(config) => {
+              project={project}
+                    config={currentConfig}
+                    setConfig={setCurrentConfig}
+                    imageConnections={imageConnections}
+                    onGenerate={(config) => {
                 handleGenerate(config);
                 setBuilderDrawerOpen(false);
               }}

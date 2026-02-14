@@ -7,14 +7,23 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { uploadNeuroDesignFile } from '@/lib/neurodesignStorage';
 import { cn } from '@/lib/utils';
+
+const REFINE_DIMENSIONS = [
+  { value: '1:1', label: '1:1 Feed' },
+  { value: '4:5', label: '4:5 Feed' },
+  { value: '9:16', label: '9:16 Stories' },
+  { value: '16:9', label: '16:9 Horizontal' },
+];
 
 const isDemoPlaceholder = (url) => url && typeof url === 'string' && url.includes('placehold.co');
 
 const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage }) => {
   const { toast } = useToast();
   const [refineInstruction, setRefineInstruction] = useState('');
+  const [refineDimensions, setRefineDimensions] = useState('1:1');
   const [referenceArtFile, setReferenceArtFile] = useState(null);
   const [referenceArtPreviewUrl, setReferenceArtPreviewUrl] = useState('');
   const [replacementFile, setReplacementFile] = useState(null);
@@ -26,6 +35,11 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const [drawCurrent, setDrawCurrent] = useState(null);
   const previewContainerRef = useRef(null);
   const previewImgRef = useRef(null);
+  const referenceArtInputRef = useRef(null);
+  const replacementInputRef = useRef(null);
+  const addImageInputRef = useRef(null);
+  const [addImageFile, setAddImageFile] = useState(null);
+  const [addImagePreviewUrl, setAddImagePreviewUrl] = useState('');
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const imageUrl = selectedImage?.url || selectedImage?.thumbnail_url;
@@ -42,6 +56,25 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     setReplacementFile(null);
     if (replacementPreviewUrl) URL.revokeObjectURL(replacementPreviewUrl);
     setReplacementPreviewUrl('');
+  };
+
+  const clearAddImage = () => {
+    setAddImageFile(null);
+    if (addImagePreviewUrl) URL.revokeObjectURL(addImagePreviewUrl);
+    setAddImagePreviewUrl('');
+  };
+
+  const handleAddImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)/i.test(file.type)) {
+      toast({ title: 'Use uma imagem (JPEG, PNG, WebP ou GIF)', variant: 'destructive' });
+      return;
+    }
+    clearAddImage();
+    setAddImageFile(file);
+    setAddImagePreviewUrl(URL.createObjectURL(file));
+    e.target.value = '';
   };
 
   const handleReferenceArtChange = (e) => {
@@ -148,17 +181,25 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
     setSelectionRegion(null);
   };
 
+  const hasAnyRefineAction = !!(
+    refineInstruction.trim() ||
+    referenceArtFile ||
+    replacementFile ||
+    addImageFile ||
+    selectionRegion
+  );
+
   const handleRefineClick = async () => {
-    const instruction = refineInstruction.trim();
-    if (!instruction) return;
     if (!project?.id || !user?.id) {
       toast({ title: 'Selecione um projeto para refinar', variant: 'destructive' });
       return;
     }
+    const instruction = refineInstruction.trim();
 
     setIsUploadingRefine(true);
     let referenceImageUrl = '';
     let replacementImageUrl = '';
+    let addImageUrl = '';
     let regionCropImageUrl = '';
     let region = selectionRegion || undefined;
 
@@ -168,6 +209,9 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
       }
       if (replacementFile) {
         replacementImageUrl = await uploadNeuroDesignFile(user.id, project.id, 'refine_replacement', replacementFile);
+      }
+      if (addImageFile) {
+        addImageUrl = await uploadNeuroDesignFile(user.id, project.id, 'refine_add', addImageFile);
       }
       if (selectionRegion && imageUrl) {
         const cropBlob = await generateCropBlob();
@@ -179,8 +223,10 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
       const payload = {
         instruction,
+        configOverrides: { dimensions: refineDimensions },
         ...(referenceImageUrl && { referenceImageUrl }),
         ...(replacementImageUrl && { replacementImageUrl }),
+        ...(addImageUrl && { addImageUrl }),
         ...(region && { region }),
         ...(regionCropImageUrl && { regionCropImageUrl }),
       };
@@ -188,9 +234,19 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
       setRefineInstruction('');
       clearReferenceArt();
       clearReplacement();
+      clearAddImage();
       clearSelection();
     } catch (e) {
-      toast({ title: 'Erro ao enviar imagens', description: e?.message, variant: 'destructive' });
+      const msg = e?.message || String(e);
+      const hint = /bucket|storage|policy|row-level|RLS|forbidden|403/i.test(msg)
+        ? ' Verifique no Supabase: bucket "neurodesign" existe e as políticas de Storage estão aplicadas (veja supabase/migrations/neurodesign_storage_bucket.sql).'
+        : '';
+      toast({
+        title: 'Erro ao enviar imagens',
+        description: msg + hint,
+        variant: 'destructive',
+        duration: 8000,
+      });
     } finally {
       setIsUploadingRefine(false);
     }
@@ -298,6 +354,19 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
               <p className="text-xs text-muted-foreground font-medium">Opções avançadas (opcional)</p>
               <div className="flex flex-wrap gap-4">
                 <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
+                  <Select value={refineDimensions} onValueChange={setRefineDimensions}>
+                    <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground">
+                      {REFINE_DIMENSIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <label className="text-xs text-muted-foreground block mb-1">Referência de arte</label>
                   <div className="flex items-center gap-2">
                     {referenceArtPreviewUrl ? (
@@ -308,10 +377,24 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                         </button>
                       </div>
                     ) : (
-                      <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0">
-                        <Upload className="h-4 w-4" />
-                        <input type="file" accept="image/*" className="hidden" onChange={handleReferenceArtChange} />
-                      </label>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => referenceArtInputRef.current?.click()}
+                          className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0"
+                          aria-label="Enviar referência de arte"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </button>
+                        <input
+                          ref={referenceArtInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          aria-hidden
+                          onChange={handleReferenceArtChange}
+                        />
+                      </>
                     )}
                     <span className="text-xs text-muted-foreground">Crie semelhante a essa arte</span>
                   </div>
@@ -327,12 +410,59 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                         </button>
                       </div>
                     ) : (
-                      <label className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0">
-                        <Upload className="h-4 w-4" />
-                        <input type="file" accept="image/*" className="hidden" onChange={handleReplacementChange} />
-                      </label>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => replacementInputRef.current?.click()}
+                          className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0"
+                          aria-label="Enviar imagem para substituir"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </button>
+                        <input
+                          ref={replacementInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          aria-hidden
+                          onChange={handleReplacementChange}
+                        />
+                      </>
                     )}
                     <span className="text-xs text-muted-foreground">Substitua elemento (use seleção ou instrução)</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Imagem para adicionar na cena</label>
+                  <div className="flex items-center gap-2">
+                    {addImagePreviewUrl ? (
+                      <div className="relative">
+                        <img src={addImagePreviewUrl} alt="Adicionar" className="w-14 h-14 rounded object-cover border border-border" />
+                        <button type="button" onClick={clearAddImage} className="absolute -top-1 -right-1 bg-foreground/80 text-background rounded-full p-0.5">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => addImageInputRef.current?.click()}
+                          className="w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted shrink-0"
+                          aria-label="Enviar imagem para adicionar na cena"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </button>
+                        <input
+                          ref={addImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          aria-hidden
+                          onChange={handleAddImageChange}
+                        />
+                      </>
+                    )}
+                    <span className="text-xs text-muted-foreground">Inclua esta imagem na cena</span>
                   </div>
                 </div>
               </div>
@@ -347,7 +477,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
               />
               <Button
                 onClick={handleRefineClick}
-                disabled={!refineInstruction.trim() || isUploadingRefine}
+                disabled={!hasAnyRefineAction || isUploadingRefine}
                 className="shrink-0"
               >
                 {isUploadingRefine ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}

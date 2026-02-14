@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function getDimensionsFromConfig(dimensions: string | undefined): { width: number; height: number } {
+  const d = (dimensions || "1:1").trim();
+  if (d === "4:5") return { width: 1024, height: 1280 };
+  if (d === "9:16") return { width: 1024, height: 1820 };
+  if (d === "16:9") return { width: 1820, height: 1024 };
+  return { width: 1024, height: 1024 };
+}
+
 type Conn = { id: number; user_id: string; provider: string; api_key: string; api_url: string; default_model: string | null };
 
 async function imageUrlToBase64(imageUrl: string): Promise<{ data: string; mimeType: string } | null> {
@@ -87,23 +95,30 @@ serve(async (req) => {
       userAiConnectionId,
       referenceImageUrl,
       replacementImageUrl,
+      addImageUrl,
       region,
       regionCropImageUrl,
     } = body as {
       projectId: string;
       runId: string;
       imageId: string;
-      instruction: string;
+      instruction?: string;
       configOverrides?: Record<string, unknown>;
       userAiConnectionId?: string;
       referenceImageUrl?: string;
       replacementImageUrl?: string;
+      addImageUrl?: string;
       region?: { x: number; y: number; width: number; height: number };
       regionCropImageUrl?: string;
     };
 
-    if (!projectId || !runId || !imageId || !instruction?.trim()) {
-      return new Response(JSON.stringify({ error: "projectId, runId, imageId e instruction são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const instructionTrimmed = (instruction ?? "").trim();
+    const hasAnyAction = instructionTrimmed || referenceImageUrl || replacementImageUrl || addImageUrl || region;
+    if (!projectId || !runId || !imageId) {
+      return new Response(JSON.stringify({ error: "projectId, runId e imageId são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!hasAnyAction) {
+      return new Response(JSON.stringify({ error: "Envie ao menos uma ação: instrução, referência de arte, imagem para substituir, imagem para adicionar na cena ou região selecionada" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!userAiConnectionId) {
@@ -147,12 +162,13 @@ serve(async (req) => {
       status: "running",
       provider: "google",
       parent_run_id: runId,
-      refine_instruction: instruction.trim(),
+      refine_instruction: instructionTrimmed,
       provider_request_json: {
-        instruction: instruction.trim(),
+        instruction: instructionTrimmed,
         configOverrides,
         referenceImageUrl: referenceImageUrl ?? null,
         replacementImageUrl: replacementImageUrl ?? null,
+        addImageUrl: addImageUrl ?? null,
         region: region ?? null,
         regionCropImageUrl: regionCropImageUrl ?? null,
       },
@@ -168,17 +184,33 @@ serve(async (req) => {
 
     if (referenceImageUrl && !replacementImageUrl) {
       imageUrls.push(referenceImageUrl);
-      textPrompt = `Apply the visual style of the second image (reference art) to the first image. Keep the same composition and subject of the first image, but make it look similar to the reference. Additional instruction: ${instruction.trim()}`;
+      textPrompt = instructionTrimmed
+        ? `Apply the visual style of the second image (reference art) to the first image. Keep the same composition and subject of the first image, but make it look similar to the reference. Additional instruction: ${instructionTrimmed}`
+        : "Apply the visual style of the second image (reference art) to the first image. Keep the same composition and subject of the first image, but make it look similar to the reference.";
     } else if (replacementImageUrl) {
       if (regionCropImageUrl) {
         imageUrls.push(regionCropImageUrl, replacementImageUrl);
-        textPrompt = `In the first image, replace the region that corresponds to the content shown in the second image (the selected crop) with the content of the third image. Keep the rest of the first image unchanged. ${instruction.trim()}`;
+        textPrompt = instructionTrimmed
+          ? `In the first image, replace the region that corresponds to the content shown in the second image (the selected crop) with the content of the third image. Keep the rest of the first image unchanged. ${instructionTrimmed}`
+          : "In the first image, replace the region that corresponds to the content shown in the second image (the selected crop) with the content of the third image. Keep the rest of the first image unchanged.";
       } else {
         imageUrls.push(replacementImageUrl);
-        textPrompt = `In the first image, replace the element or area described in the following instruction with the content of the second image. Keep the rest unchanged. Instruction: ${instruction.trim()}`;
+        textPrompt = instructionTrimmed
+          ? `In the first image, replace the element or area described in the following instruction with the content of the second image. Keep the rest unchanged. Instruction: ${instructionTrimmed}`
+          : "In the first image, replace the element or area with the content of the second image. Keep the rest unchanged.";
       }
     } else {
-      textPrompt = `Apply this change to the image, keep the rest the same: ${instruction.trim()}`;
+      textPrompt = instructionTrimmed
+        ? `Apply this change to the image, keep the rest the same: ${instructionTrimmed}`
+        : "Apply minimal adjustments to the image.";
+    }
+
+    if (addImageUrl) {
+      imageUrls.push(addImageUrl);
+      const addPart = instructionTrimmed
+        ? ` The last image is an element to add into the first image's scene. Integrate it naturally. User instruction: ${instructionTrimmed}`
+        : " The last image is an element to add into the first image's scene. Integrate it naturally.";
+      textPrompt = (textPrompt + addPart).trim();
     }
 
     let refinedUrl: string | null = null;
@@ -201,13 +233,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Refino não retornou imagem da API Google" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const { width, height } = getDimensionsFromConfig(configOverrides?.dimensions as string | undefined);
     const imageRow = {
       run_id: run.id,
       project_id: projectId,
       url: refinedUrl,
       thumbnail_url: refinedUrl,
-      width: 1024,
-      height: 1024,
+      width,
+      height,
     };
     const { data: insertedImages, error: insertError } = await supabase.from("neurodesign_generated_images").insert([imageRow]).select("id, url, thumbnail_url, width, height");
     if (insertError) {

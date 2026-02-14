@@ -37,7 +37,12 @@ const AuthPage = () => {
           password: formData.password,
         });
         const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
-        if (error) throw error;
+        if (error) {
+          if (import.meta.env.DEV) {
+            console.warn('[Auth] signIn error:', { status: error.status, code: error.code, message: error.message });
+          }
+          throw error;
+        }
         if (data?.session) {
           toast({ title: "Login realizado com sucesso!", description: "Bem-vindo de volta!" });
         }
@@ -60,9 +65,26 @@ const AuthPage = () => {
         }
       }
     } catch (error) {
-      const message = error?.message || 'Ocorreu um erro. Verifique suas credenciais e tente novamente.';
+      const raw = error?.message || '';
+      const status = error?.status;
+      const isNetwork = /fetch|network|failed to fetch|cors|timeout|unreachable/i.test(raw) || error?.name === 'TypeError';
+      const isTimeout = raw.includes('demorando');
+      const isCredentialError = /invalid.*credential|invalid.*login|email not confirmed/i.test(raw);
+      const isBadKey = (status === 401 || status === 403) && !isCredentialError && /jwt|key|api|token/i.test(raw);
+      let title = "Erro de Autenticação";
+      let message = raw || "Verifique suas credenciais e tente novamente.";
+      if (isNetwork || isTimeout) {
+        title = "Sem conexão com o servidor";
+        message = "Não foi possível conectar ao Supabase. Verifique a URL em .env.local e sua conexão.";
+      } else if (isBadKey) {
+        title = "Chave do Supabase incorreta";
+        message = "A chave anon (VITE_SUPABASE_ANON_KEY) não pertence a este servidor. No painel do Supabase, Project Settings > API: copie URL e anon key para o .env.local.";
+      } else if (isCredentialError || raw === "Invalid authentication credentials") {
+        title = "Login não autorizado";
+        message = "O servidor rejeitou o login. Confira: (1) A conta foi criada neste mesmo Supabase (URL do .env.local)? (2) No painel Supabase: Auth → URL Configuration → adicione http://localhost:3000 em Redirect URLs. (3) Auth → Providers → Email: se \"Confirm email\" estiver ativo, confirme o e-mail antes de logar.";
+      }
       toast({
-        title: "Erro de Autenticação",
+        title,
         description: message,
         variant: "destructive",
       });

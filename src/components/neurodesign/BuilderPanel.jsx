@@ -30,6 +30,22 @@ const SHOT_TYPES = [
 ];
 const STYLE_TAGS = ['clássico', 'formal', 'elegante', 'institucional', 'tecnológico', 'minimalista', 'criativo'];
 
+function hexToColorInput(hex) {
+  if (!hex || typeof hex !== 'string') return '#808080';
+  const s = hex.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s.toLowerCase();
+  if (/^[0-9a-fA-F]{3}$/.test(s)) return '#' + s.toLowerCase().split('').map((c) => c + c).join('');
+  return '#808080';
+}
+
+function normalizeHexInput(raw) {
+  if (!raw || typeof raw !== 'string') return raw;
+  const s = raw.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s.toLowerCase();
+  if (/^[0-9a-fA-F]{3}$/.test(s)) return '#' + s.toLowerCase().split('').map((c) => c + c).join('');
+  return raw;
+}
+
 const defaultConfig = () => ({
   user_ai_connection_id: null,
   subject_gender: 'feminino',
@@ -376,10 +392,64 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
 
       <div>
         <Label>Cores e iluminação</Label>
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <div><Label className="text-xs">Ambiente</Label><Input type="text" placeholder="#hex" value={localConfig.ambient_color || ''} onChange={(e) => update('ambient_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
-          <div><Label className="text-xs">Recorte</Label><Input type="text" placeholder="#hex" value={localConfig.rim_light_color || ''} onChange={(e) => update('rim_light_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
-          <div><Label className="text-xs">Preenchimento</Label><Input type="text" placeholder="#hex" value={localConfig.fill_light_color || ''} onChange={(e) => update('fill_light_color', e.target.value)} className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8" /></div>
+        <div className="space-y-3 mt-2">
+          <div>
+            <Label className="text-xs">Ambiente</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="color"
+                value={hexToColorInput(localConfig.ambient_color)}
+                onChange={(e) => update('ambient_color', e.target.value)}
+                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                title="Escolher cor"
+              />
+              <Input
+                type="text"
+                placeholder="#hex"
+                value={localConfig.ambient_color || ''}
+                onChange={(e) => update('ambient_color', normalizeHexInput(e.target.value) || e.target.value)}
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 flex-1 min-w-0"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Recorte</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="color"
+                value={hexToColorInput(localConfig.rim_light_color)}
+                onChange={(e) => update('rim_light_color', e.target.value)}
+                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                title="Escolher cor"
+              />
+              <Input
+                type="text"
+                placeholder="#hex"
+                value={localConfig.rim_light_color || ''}
+                onChange={(e) => update('rim_light_color', normalizeHexInput(e.target.value) || e.target.value)}
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 flex-1 min-w-0"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Preenchimento</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="color"
+                value={hexToColorInput(localConfig.fill_light_color)}
+                onChange={(e) => update('fill_light_color', e.target.value)}
+                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                title="Escolher cor"
+              />
+              <Input
+                type="text"
+                placeholder="#hex"
+                value={localConfig.fill_light_color || ''}
+                onChange={(e) => update('fill_light_color', normalizeHexInput(e.target.value) || e.target.value)}
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 flex-1 min-w-0"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
