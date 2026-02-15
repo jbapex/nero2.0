@@ -34,10 +34,16 @@ serve(async (req) => {
 
     const {
       data: { user },
+      error: userError,
     } = await supabaseUser.auth.getUser();
     if (!user) {
+      const message = !authHeader
+        ? "Authorization header required"
+        : userError?.message?.toLowerCase().includes("jwt")
+          ? "Token inválido ou expirado. Faça login novamente."
+          : "Não autorizado. Faça login novamente.";
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

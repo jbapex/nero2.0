@@ -43,7 +43,7 @@ function buildFlowContextText(inputData) {
 
 const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
   'subject_gender', 'subject_description', 'niche_project', 'environment',
-  'shot_type', 'layout_position', 'dimensions', 'text_enabled', 'headline_h1',
+  'shot_type', 'layout_position', 'dimensions', 'image_size', 'text_enabled', 'headline_h1',
   'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
   'visual_attributes', 'ambient_color', 'rim_light_color', 'fill_light_color',
   'floating_elements_enabled', 'floating_elements_text', 'additional_prompt',
@@ -54,8 +54,46 @@ const NEURODESIGN_FILL_ENUMS = {
   layout_position: ['esquerda', 'centro', 'direita'],
   dimensions: ['1:1', '4:5', '9:16', '16:9'],
   text_position: ['esquerda', 'centro', 'direita'],
+  image_size: ['1K', '2K', '4K'],
 };
 const NEURODESIGN_STYLE_TAGS = ['clássico', 'formal', 'elegante', 'institucional', 'tecnológico', 'minimalista', 'criativo'];
+
+function parseNeuroDesignFillResponse(raw) {
+  let str = (raw || '').trim();
+  const stripMarkdown = (s) => s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  str = stripMarkdown(str);
+  const firstBrace = str.indexOf('{');
+  if (firstBrace === -1) return null;
+  let depth = 0;
+  let end = -1;
+  for (let i = firstBrace; i < str.length; i++) {
+    if (str[i] === '{') depth++;
+    else if (str[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  const jsonStr = end !== -1 ? str.slice(firstBrace, end + 1) : str.slice(firstBrace);
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeShotType(v) {
+  if (!v || typeof v !== 'string') return null;
+  const s = v.trim().toLowerCase();
+  if (s.includes('close') || s === 'closeup') return 'close-up';
+  if (s.includes('americano') || s.includes('full') || s.includes('corpo')) return 'americano';
+  if (s.includes('medio') || s.includes('busto') || s.includes('medium') || s.includes('meio')) return 'medio busto';
+  return null;
+}
+function normalizeImageSizeVal(v) {
+  if (!v || typeof v !== 'string') return null;
+  const s = v.trim().toUpperCase();
+  if (s === '1K' || s === '1024') return '1K';
+  if (s === '2K' || s === '2048') return '2K';
+  if (s === '4K' || s === '4096') return '4K';
+  return null;
+}
 
 const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedded, onCollapse }) => {
   const { user } = useAuth();
@@ -325,22 +363,29 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       toast({ title: 'Nenhuma conexão de IA ativa', description: 'Configure uma conexão em Minha IA.', variant: 'destructive' });
       return;
     }
-    const systemPrompt = `Você é um assistente que extrai dados estruturados de briefs criativos para preencher um formulário de geração de imagem (NeuroDesign).
-Responda APENAS com um único objeto JSON válido, sem markdown, sem texto antes ou depois. Use apenas as chaves que conseguir inferir do texto; omita as que não fizerem sentido.
-Regras:
+    const systemPrompt = `Você é um assistente que extrai dados estruturados de briefs/prompts criativos para preencher um formulário de geração de imagem (NeuroDesign).
+Responda APENAS com um único objeto JSON válido. Sem markdown, sem \`\`\`json, sem texto antes ou depois do objeto.
+Extraia o máximo de informações do texto. Para valores não mencionados, omita a chave.
+Mapeamento de termos comuns:
+- Formato: "feed" ou "quadrado" -> dimensions "1:1"; "stories" ou "vertical" -> "9:16"; "horizontal" ou "banner" -> "16:9"; "4:5" ou "retrato feed" -> "4:5"
+- Plano: "close" ou "rosto" -> shot_type "close-up"; "médio" ou "busto" -> "medio busto"; "americano" ou "corpo inteiro" -> "americano"
+- Qualidade: "alta" ou "2k" ou "alta resolução" -> image_size "2K"; "máxima" ou "4k" -> "4K"; caso contrário use "1K"
+Chaves e valores exatos obrigatórios (use exatamente assim no JSON):
 - subject_gender: "masculino" ou "feminino"
-- subject_description: string (descrição do sujeito/pose/roupa)
-- niche_project: string (nicho ou contexto do projeto)
-- environment: string (ambiente/cenário)
-- shot_type: exatamente um de "close-up", "medio busto", "americano"
-- layout_position: exatamente um de "esquerda", "centro", "direita"
-- dimensions: exatamente um de "1:1", "4:5", "9:16", "16:9"
-- text_enabled: boolean. Se true, preencha headline_h1, subheadline_h2, cta_button_text quando aplicável
-- text_position: "esquerda", "centro" ou "direita"
-- visual_attributes: objeto opcional com style_tags (array com valores entre: clássico, formal, elegante, institucional, tecnológico, minimalista, criativo), sobriety (0-100), ultra_realistic (boolean), blur_enabled (boolean), lateral_gradient_enabled (boolean)
-- additional_prompt: string com instruções extras
-- ambient_color, rim_light_color, fill_light_color: strings (hex ou descrição)
-- floating_elements_enabled: boolean, floating_elements_text: string`;
+- subject_description: string (pose, roupa, expressão)
+- niche_project: string (nicho do negócio/projeto)
+- environment: string (cenário, ambiente, local)
+- shot_type: exatamente "close-up" ou "medio busto" ou "americano"
+- layout_position: exatamente "esquerda" ou "centro" ou "direita"
+- dimensions: exatamente "1:1" ou "4:5" ou "9:16" ou "16:9"
+- image_size: exatamente "1K" ou "2K" ou "4K" (qualidade da imagem)
+- text_enabled: true ou false. Se true, preencha headline_h1, subheadline_h2, cta_button_text
+- text_position: "esquerda" ou "centro" ou "direita"
+- visual_attributes: objeto com style_tags (array só com: clássico, formal, elegante, institucional, tecnológico, minimalista, criativo), sobriety (número 0-100), ultra_realistic, blur_enabled, lateral_gradient_enabled (boolean)
+- additional_prompt: string com instruções extras para a IA de imagem
+- ambient_color, rim_light_color, fill_light_color: string (cor em hex #RRGGBB ou descrição)
+- floating_elements_enabled: boolean, floating_elements_text: string (elementos flutuantes)
+Responda somente com o JSON.`;
 
     setIsFillingFromPrompt(true);
     try {
@@ -359,31 +404,34 @@ Regras:
       if (error) throw new Error(error.message || error);
       if (data?.error) throw new Error(data.error);
       const raw = data?.response || data?.content || '';
-      let parsed = null;
-      try {
-        parsed = JSON.parse(raw.trim());
-      } catch (_e) {
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const str = jsonMatch[1] || jsonMatch[0];
-          parsed = JSON.parse(str.trim());
-        }
-        if (!parsed) throw new Error('Resposta da IA não contém JSON válido.');
-      }
+      const parsed = parseNeuroDesignFillResponse(raw);
+      if (!parsed || typeof parsed !== 'object') throw new Error('Resposta da IA não contém JSON válido.');
       const sanitized = {};
       for (const key of Object.keys(parsed)) {
         if (!NEURODESIGN_FILL_ALLOWED_KEYS.has(key)) continue;
         let value = parsed[key];
-        if (NEURODESIGN_FILL_ENUMS[key] && typeof value === 'string') {
+        if (key === 'shot_type' && typeof value === 'string') {
+          const normalized = normalizeShotType(value) || (NEURODESIGN_FILL_ENUMS.shot_type.includes(value.trim()) ? value.trim() : null);
+          if (normalized) sanitized[key] = normalized;
+        } else if (key === 'image_size' && (typeof value === 'string' || typeof value === 'number')) {
+          const normalized = normalizeImageSizeVal(String(value)) || (NEURODESIGN_FILL_ENUMS.image_size.includes(String(value).trim().toUpperCase()) ? String(value).trim().toUpperCase() : null);
+          if (normalized) sanitized[key] = normalized;
+        } else if (NEURODESIGN_FILL_ENUMS[key] && typeof value === 'string') {
           const v = value.trim().toLowerCase();
-          if (NEURODESIGN_FILL_ENUMS[key].includes(v)) sanitized[key] = v;
+          const enumList = NEURODESIGN_FILL_ENUMS[key];
+          const match = enumList.find((e) => e.toLowerCase() === v || e.replace(/\s/g, '') === v.replace(/\s/g, ''));
+          if (match) sanitized[key] = match;
         } else if (key === 'visual_attributes' && value && typeof value === 'object') {
           const prev = currentConfig?.visual_attributes || {};
           const next = { ...prev };
-          if (Array.isArray(value.style_tags)) {
-            next.style_tags = value.style_tags.filter((t) => NEURODESIGN_STYLE_TAGS.includes(String(t).toLowerCase()));
+          let tags = value.style_tags;
+          if (typeof tags === 'string') tags = tags.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+          if (Array.isArray(tags)) {
+            next.style_tags = tags.map((t) => String(t).toLowerCase()).filter((t) => NEURODESIGN_STYLE_TAGS.includes(t));
           }
-          if (typeof value.sobriety === 'number' && value.sobriety >= 0 && value.sobriety <= 100) next.sobriety = value.sobriety;
+          const sob = value.sobriety;
+          if (typeof sob === 'number' && sob >= 0 && sob <= 100) next.sobriety = sob;
+          else if (typeof sob === 'string' && /^\d+$/.test(sob.trim())) { const n = parseInt(sob.trim(), 10); if (n >= 0 && n <= 100) next.sobriety = n; }
           if (typeof value.ultra_realistic === 'boolean') next.ultra_realistic = value.ultra_realistic;
           if (typeof value.blur_enabled === 'boolean') next.blur_enabled = value.blur_enabled;
           if (typeof value.lateral_gradient_enabled === 'boolean') next.lateral_gradient_enabled = value.lateral_gradient_enabled;

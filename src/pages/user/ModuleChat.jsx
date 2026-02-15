@@ -408,6 +408,7 @@ const ModuleChat = () => {
 
         // Fallback: usar função generate-content (comportamento antigo)
         {
+          await supabase.auth.refreshSession();
           const { data, error } = await supabase.functions.invoke('generate-content', {
               body: JSON.stringify({
                   module_id: moduleId,
@@ -418,7 +419,9 @@ const ModuleChat = () => {
           });
           if (error) {
               const errorBody = await (error.context?.json ? error.context.json() : Promise.resolve({ error: error.message }));
-              throw new Error(errorBody.error || error.message);
+              const msg = errorBody?.error || error.message;
+              const isUnauthorized = /unauthorized|não autorizado|token|login/i.test(msg) || error.message?.includes('401');
+              throw new Error(isUnauthorized ? 'Sessão expirada ou inválida. Faça login novamente e tente de novo.' : msg);
           }
           setGeneratedContent(data.generatedText);
           setLastOutput({ id: data.outputId, is_favorited: false });
