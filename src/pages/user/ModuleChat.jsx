@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import EditWithAiModal from '@/components/strategic-planner/EditWithAiModal';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 
+const CONTEXT_INSTRUCTION = `Na mensagem do usuário pode aparecer um bloco [CONTEXTO] com dados do módulo, cliente, campanha e documentos de contexto. Use sempre essas informações para personalizar e fundamentar sua resposta. Não peça ao usuário dados que já constem no [CONTEXTO].`;
 
 const ModuleChat = () => {
   const { moduleId } = useParams();
@@ -361,11 +362,11 @@ const ModuleChat = () => {
             }
             const contextHeader = contextLines.length ? `[CONTEXTO]\n${contextLines.join('\n')}\n\n` : '';
 
-            const messages = [];
-            if (module?.base_prompt) {
-              messages.push({ role: 'system', content: module.base_prompt });
-            }
-            messages.push({ role: 'user', content: `${contextHeader}${finalUserText || 'Gerar conteúdo para o módulo selecionado.'}` });
+            const systemContent = CONTEXT_INSTRUCTION + (module?.base_prompt ? '\n\n' + module.base_prompt : '');
+            const messages = [
+              { role: 'system', content: systemContent },
+              { role: 'user', content: `${contextHeader}${finalUserText || 'Gerar conteúdo para o módulo selecionado.'}` },
+            ];
 
             const { data: chatData, error: chatError } = await supabase.functions.invoke('generic-ai-chat', {
               body: JSON.stringify({

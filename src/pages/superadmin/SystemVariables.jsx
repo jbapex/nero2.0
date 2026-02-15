@@ -64,7 +64,46 @@ import React from 'react';
         { title: "Resumo da Análise", description: "Resumo executivo da análise de campanha.", variable: "{{dados_analise.resumo_executivo}}" },
         { title: "Plano de Ação da Análise", description: "Plano de ação sugerido na análise.", variable: "{{dados_analise.plano_de_acao}}" },
     ];
-    
+
+    const contextBlockVariables = [
+        { title: "Bloco [CONTEXTO]", description: "Bloco injetado automaticamente na mensagem do usuário no Gerador de Conteúdo (ex.: Arte Estática). Contém nome do módulo, cliente, campanha e documentos de contexto selecionados. A IA já é instruída a usar; no prompt base do módulo você pode reforçar: \"use as informações em [CONTEXTO]\".", variable: "[CONTEXTO]" },
+    ];
+
+    const agentResultVariables = [
+        { title: "Resultado de um agente", description: "Substitua NOME_DO_AGENTE pelo nome exato do agente. Injeta o último resultado gerado por esse agente na mesma campanha ou fluxo. Use para encadear agentes (ex.: títulos → descrição).", variable: "{{resultado_agente:NOME_DO_AGENTE}}" },
+        { title: "Resultado favorito de um agente", description: "Substitua NOME_DO_AGENTE pelo nome do agente. Injeta o último resultado marcado como favorito desse agente. Útil para fixar uma versão e reutilizá-la em outro agente.", variable: "{{resultado_favorito_agente:NOME_DO_AGENTE}}" },
+    ];
+
+    const userTextVariables = [
+        { title: "Texto complementar do usuário", description: "Texto livre que o usuário digitou no campo \"Informações para a IA\" ou equivalente no Gerador de Conteúdo e em fluxos.", variable: "{{texto_usuario}}" },
+    ];
+
+    const campaignAliasVariables = [
+        { title: "Nome da Campanha (alias)", description: "Nome da campanha. Forma alternativa usada em fluxos e agentes de campanha.", variable: "{{nome_campanha}}" },
+        { title: "Objetivo da Campanha (alias)", description: "Objetivo principal da campanha.", variable: "{{objetivo_campanha}}" },
+        { title: "Público-alvo (alias)", description: "Público-alvo da campanha.", variable: "{{publico_alvo}}" },
+        { title: "Diferencial da Marca (alias)", description: "Diferencial da marca na campanha.", variable: "{{diferencial_marca}}" },
+        { title: "Tom de Voz (alias)", description: "Tom de voz da campanha.", variable: "{{tom_de_voz}}" },
+        { title: "Orçamento da Campanha", description: "Orçamento definido para a campanha.", variable: "{{orcamento_campanha}}" },
+        { title: "Período da Campanha", description: "Período de vigência da campanha.", variable: "{{periodo_campanha}}" },
+        { title: "Canais Selecionados", description: "Canais de divulgação selecionados na campanha.", variable: "{{canais_selecionados}}" },
+        { title: "Estratégia de Lances", description: "Estratégia de lances (ex.: Meta Ads).", variable: "{{estrategia_lances}}" },
+        { title: "KPIs de Sucesso", description: "KPIs definidos para sucesso da campanha.", variable: "{{kpis_sucesso}}" },
+        { title: "Personas Detalhadas", description: "Personas definidas na estratégia.", variable: "{{personas_detalhadas}}" },
+        { title: "Estratégia de Conteúdo", description: "Estratégia de conteúdo da campanha.", variable: "{{estrategia_conteudo}}" },
+    ];
+
+    const clientAliasVariables = [
+        { title: "Dados do Cliente (alias)", description: "Objeto com todos os dados do cliente. Usado em fluxos e agentes.", variable: "{{dados_cliente}}" },
+        { title: "Nome do Cliente (alias)", description: "Nome do cliente/empresa. Forma alternativa a {{cliente.name}}.", variable: "{{nome_cliente}}" },
+    ];
+
+    const imageBriefingVariables = [
+        { title: "Objetivo do briefing (imagem)", description: "Objetivo extraído do briefing para uso em templates de geração de imagem.", variable: "{{briefing_objetivo}}" },
+        { title: "Público-alvo do briefing (imagem)", description: "Público-alvo do briefing para prompts de imagem.", variable: "{{briefing_publico_alvo}}" },
+        { title: "Tom de voz do briefing (imagem)", description: "Tom de voz do briefing para estilizar a geração de imagem.", variable: "{{briefing_tom_de_voz}}" },
+    ];
+
     const SystemVariables = () => {
       const { toast } = useToast();
     
@@ -111,7 +150,7 @@ import React from 'react';
             <CardHeader>
               <CardTitle className="text-3xl">Variáveis de Sistema</CardTitle>
               <CardDescription>
-                Use estas variáveis nos seus prompts de IA para criar conteúdo dinâmico e personalizado. Elas serão substituídas pelos dados correspondentes da campanha ou do cliente.
+                Use estas variáveis nos blocos de conteúdo, prompts de módulos, agentes e templates de imagem. Elas são substituídas pelos dados da campanha, cliente, planejamento, análise, resultados de agentes e texto do usuário.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -134,6 +173,36 @@ import React from 'react';
                 "Variáveis da Análise",
                 "Resultados e insights do Analisador de Campanhas.",
                 analysisVariables
+              )}
+              {renderVariableSection(
+                "Bloco de contexto (Gerador de Conteúdo / Módulos)",
+                "Bloco injetado automaticamente na tela de módulos (ex.: Arte Estática). Use no prompt base do módulo para referenciar dados do cliente, campanha e documentos de contexto.",
+                contextBlockVariables
+              )}
+              {renderVariableSection(
+                "Variáveis de resultado de agentes",
+                "Reutilize o output de um agente no prompt de outro. Substitua NOME_DO_AGENTE pelo nome exato do agente.",
+                agentResultVariables
+              )}
+              {renderVariableSection(
+                "Variáveis de texto e usuário",
+                "Texto livre inserido pelo usuário nos formulários de geração.",
+                userTextVariables
+              )}
+              {renderVariableSection(
+                "Variáveis de campanha (alias para fluxos e agentes)",
+                "Formas alternativas usadas em fluxos criativos e agentes de campanha.",
+                campaignAliasVariables
+              )}
+              {renderVariableSection(
+                "Variáveis de cliente (alias)",
+                "Formas alternativas para dados do cliente em fluxos e agentes.",
+                clientAliasVariables
+              )}
+              {renderVariableSection(
+                "Variáveis de briefing para imagem",
+                "Usadas em templates de geração de imagem (presets) para injetar dados da campanha.",
+                imageBriefingVariables
               )}
             </CardContent>
           </Card>

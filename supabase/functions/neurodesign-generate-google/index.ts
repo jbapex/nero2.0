@@ -85,11 +85,18 @@ async function fetchImageAsBase64(imageUrl: string): Promise<{ data: string; mim
   }
 }
 
+const ALLOWED_IMAGE_SIZES = ["1K", "2K", "4K"] as const;
+function normalizeImageSize(raw: unknown): "1K" | "2K" | "4K" {
+  const s = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+  return ALLOWED_IMAGE_SIZES.includes(s as "1K" | "2K" | "4K") ? (s as "1K" | "2K" | "4K") : "1K";
+}
+
 async function generateWithGoogleGemini(
   conn: Conn,
   prompt: string,
   quantity: number,
   dimensions: string,
+  imageSize: "1K" | "2K" | "4K",
   subjectImageUrls: string[] = [],
   styleReferenceUrls: string[] = [],
   styleInstruction?: string,
@@ -118,7 +125,7 @@ async function generateWithGoogleGemini(
     contents: [{ parts: contentParts }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      imageConfig: { aspectRatio, imageSize: "1K" },
+      imageConfig: { aspectRatio, imageSize },
     },
   };
   const res = await fetch(url, {
@@ -231,6 +238,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: runError?.message || "Erro ao criar run" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const imageSize = normalizeImageSize(config.image_size);
     let images: { url: string }[];
     try {
       images = await generateWithGoogleGemini(
@@ -238,6 +246,7 @@ serve(async (req) => {
         prompt,
         quantity,
         (config.dimensions as string) || "1:1",
+        imageSize,
         subjectImageUrls,
         styleReferenceUrls,
         styleInstruction,

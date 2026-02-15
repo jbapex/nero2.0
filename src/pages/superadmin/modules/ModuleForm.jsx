@@ -179,13 +179,16 @@ const ModuleForm = ({
               value={formData.base_prompt}
               onChange={(e) => setFormData({ ...formData, base_prompt: e.target.value })}
               className="min-h-[150px]"
-              placeholder="Ex: Crie uma legenda para Instagram sobre [TEMA].\n\n---\n\n{{dados_campanha}}"
+              placeholder="Ex: Crie uma arte estática. Use as informações em [CONTEXTO] quando fornecidas."
               required
             />
-            <div className="flex items-start text-xs text-muted-foreground mt-2 p-2 bg-muted/50 rounded-md">
+            <div className="flex items-start text-xs text-muted-foreground mt-2 p-2 bg-muted/50 rounded-md space-y-1">
               <Info className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
-              <span>
-                Use variáveis como <code className="bg-gray-700 px-1 py-0.5 rounded text-foreground font-mono">{'{{resultado_agente:NOME_DO_AGENTE}}'}</code> para usar o output de outro agente.
+              <span className="block">
+                O sistema adiciona automaticamente um bloco <code className="bg-gray-700 px-1 py-0.5 rounded text-foreground font-mono">[CONTEXTO]</code> com dados do cliente, campanha e contexto selecionado (quando disponíveis). O modelo já é instruído a usar esse bloco; você pode reforçar no prompt algo como &quot;use as informações em [CONTEXTO]&quot;.
+              </span>
+              <span className="block">
+                Variáveis: <code className="bg-gray-700 px-1 py-0.5 rounded text-foreground font-mono">{'{{resultado_agente:NOME_DO_AGENTE}}'}</code> para usar o output de outro agente.
               </span>
             </div>
           </div>

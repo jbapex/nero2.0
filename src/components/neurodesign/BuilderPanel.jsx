@@ -75,6 +75,7 @@ const defaultConfig = () => ({
   style_reference_instructions: [],
   visual_attributes: { sobriety: 50, style_tags: [], ultra_realistic: false, blur_enabled: false, lateral_gradient_enabled: false },
   additional_prompt: '',
+  image_size: '1K',
 });
 
 const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate, isGenerating, onFillFromPrompt, hasLlmConnection, isFillingFromPrompt }) => {
@@ -313,6 +314,22 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
             </Button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <Label>Qualidade da imagem</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {[
+            { value: '1K', label: '1K (padrão)' },
+            { value: '2K', label: '2K' },
+            { value: '4K', label: '4K' },
+          ].map((q) => (
+            <Button key={q.value} type="button" variant={localConfig.image_size === q.value ? 'default' : 'outline'} size="sm" onClick={() => update('image_size', q.value)} className={localConfig.image_size === q.value ? 'bg-primary' : 'border-border'}>
+              {q.label}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">2K e 4K geram imagem em maior resolução; podem consumir mais cota da API. 4K pode não estar disponível em todos os modelos/planos.</p>
       </div>
 
       <div>

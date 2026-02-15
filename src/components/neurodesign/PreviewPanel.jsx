@@ -18,6 +18,12 @@ const REFINE_DIMENSIONS = [
   { value: '16:9', label: '16:9 Horizontal' },
 ];
 
+const REFINE_IMAGE_SIZES = [
+  { value: '1K', label: '1K' },
+  { value: '2K', label: '2K' },
+  { value: '4K', label: '4K' },
+];
+
 const SELECTION_ACTIONS = [
   { value: 'add_text', label: 'Adicionar texto aqui', icon: Type },
   { value: 'remove_text', label: 'Remover texto só nesta área', icon: Eraser },
@@ -43,6 +49,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
   const { toast } = useToast();
   const [refineInstruction, setRefineInstruction] = useState('');
   const [refineDimensions, setRefineDimensions] = useState('1:1');
+  const [refineImageSize, setRefineImageSize] = useState('1K');
   const [referenceArtFile, setReferenceArtFile] = useState(null);
   const [referenceArtPreviewUrl, setReferenceArtPreviewUrl] = useState('');
   const [replacementFile, setReplacementFile] = useState(null);
@@ -263,7 +270,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
       const payload = {
         instruction,
-        configOverrides: { dimensions: refineDimensions },
+        configOverrides: { dimensions: refineDimensions, image_size: refineImageSize },
         ...(referenceImageUrl && { referenceImageUrl }),
         ...(replacementImageUrl && { replacementImageUrl }),
         ...(addImageUrl && { addImageUrl }),
@@ -650,18 +657,33 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
             {/* Opções avançadas: apenas dimensões, mais discreto */}
             <div className="mt-4 pt-3 border-t border-border space-y-2">
               <p className="text-xs text-muted-foreground font-medium">Opções avançadas (opcional)</p>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
-                <Select value={refineDimensions} onValueChange={setRefineDimensions}>
-                  <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover text-popover-foreground">
-                    {REFINE_DIMENSIONS.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
+                  <Select value={refineDimensions} onValueChange={setRefineDimensions}>
+                    <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground">
+                      {REFINE_DIMENSIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Qualidade</label>
+                  <Select value={refineImageSize} onValueChange={setRefineImageSize}>
+                    <SelectTrigger className="w-[100px] h-8 bg-muted border-border text-foreground text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground">
+                      {REFINE_IMAGE_SIZES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </>
