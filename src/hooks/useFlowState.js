@@ -161,6 +161,8 @@ export const useFlowState = (flowData) => {
             case 'knowledge':
                 nodeData.knowledgeSources = knowledgeSources;
                 break;
+            case 'carousel':
+                break;
             default:
                 break;
         }
@@ -169,9 +171,65 @@ export const useFlowState = (flowData) => {
         setNodes((nds) => nds.concat(newNode));
     }, [setNodes, clients, campaigns, modules, plannings, analyses, presets, knowledgeSources]);
 
+    const addImageOutputNode = useCallback((sourceNodeId, imageUrl, imageData = {}) => {
+        setNodes((nds) => {
+            const source = nds.find((n) => n.id === sourceNodeId);
+            if (!source) return nds;
+            const position = { x: (source.position?.x ?? 0) + 320, y: source.position?.y ?? 0 };
+            const newId = `generated_image-${uuidv4()}`;
+            const newNode = getNodeDefaults('generated_image', position, { label: 'Imagem gerada', imageUrl, ...imageData });
+            newNode.id = newId;
+            newNode.data = { ...newNode.data, imageUrl, label: newNode.data.label || 'Imagem gerada' };
+            queueMicrotask(() => {
+                setEdges((eds) => addEdge({ source: sourceNodeId, target: newId, animated: true }, eds));
+            });
+            return nds.concat(newNode);
+        });
+    }, [setNodes, setEdges]);
+
+    const addAgentOutputNode = useCallback((sourceNodeId, generatedText, outputData = {}) => {
+        setNodes((nds) => {
+            const source = nds.find((n) => n.id === sourceNodeId);
+            if (!source) return nds;
+            const position = { x: (source.position?.x ?? 0) + 320, y: source.position?.y ?? 0 };
+            const newId = `generated_content-${uuidv4()}`;
+            const label = outputData.moduleName ? `Conteúdo: ${outputData.moduleName}` : 'Conteúdo gerado';
+            const newNode = getNodeDefaults('generated_content', position, { label, content: generatedText, generatedText, ...outputData });
+            newNode.id = newId;
+            newNode.data = {
+                ...newNode.data,
+                content: generatedText,
+                generatedText,
+                label: newNode.data.label || 'Conteúdo gerado',
+                output: { id: newId, data: generatedText, moduleName: outputData.moduleName },
+            };
+            queueMicrotask(() => {
+                setEdges((eds) => addEdge({ source: sourceNodeId, target: newId, animated: true }, eds));
+            });
+            return nds.concat(newNode);
+        });
+    }, [setNodes, setEdges]);
+
+    const addCarouselSlideImageNode = useCallback((sourceNodeId, sourceHandleId, imageUrl, imageData = {}) => {
+        setNodes((nds) => {
+            const source = nds.find((n) => n.id === sourceNodeId);
+            if (!source) return nds;
+            const slideIndex = parseInt(String(sourceHandleId).replace('slide-', ''), 10) || 0;
+            const position = { x: (source.position?.x ?? 0) + 320, y: (source.position?.y ?? 0) + slideIndex * 80 };
+            const newId = `generated_image-${uuidv4()}`;
+            const newNode = getNodeDefaults('generated_image', position, { label: 'Imagem gerada', imageUrl, ...imageData });
+            newNode.id = newId;
+            newNode.data = { ...newNode.data, imageUrl, label: newNode.data.label || 'Imagem gerada' };
+            queueMicrotask(() => {
+                setEdges((eds) => addEdge({ source: sourceNodeId, sourceHandle: sourceHandleId, target: newId, animated: true }, eds));
+            });
+            return nds.concat(newNode);
+        });
+    }, [setNodes, setEdges]);
+
     useEffect(() => {
-        setNodes((nds) =>
-            nds.map((node) => {
+        setNodes((nds) => {
+            const newNodes = nds.map((node) => {
                 const inputData = getUpstreamNodesData(node.id, nds, edges);
                 let specificData = {};
                 switch (node.type) {
@@ -185,7 +243,7 @@ export const useFlowState = (flowData) => {
                         specificData = { campaigns };
                         break;
                     case 'agent':
-                        specificData = { modules };
+                        specificData = { modules, campaigns };
                         break;
                     case 'planning':
                         specificData = { plannings };
@@ -203,9 +261,14 @@ export const useFlowState = (flowData) => {
                         break;
                 }
                 return { ...node, data: { ...node.data, ...specificData, inputData } };
-            })
-        );
-    }, [clients, campaigns, modules, plannings, analyses, presets, knowledgeSources, edges, setNodes]);
+            });
+            const inputDataUnchanged = newNodes.every(
+                (n, i) => JSON.stringify(nds[i].data.inputData) === JSON.stringify(n.data.inputData)
+            );
+            if (inputDataUnchanged) return nds;
+            return newNodes;
+        });
+    }, [clients, campaigns, modules, plannings, analyses, presets, knowledgeSources, edges, nodes, setNodes]);
 
     const handleSaveFlow = async (flowName) => {
         if (!user) return;
@@ -306,6 +369,9 @@ export const useFlowState = (flowData) => {
         onConnect,
         updateNodeData,
         addNode,
+        addImageOutputNode,
+        addAgentOutputNode,
+        addCarouselSlideImageNode,
         handleSaveFlow,
         handleNewFlow,
         handleFlowSelect,

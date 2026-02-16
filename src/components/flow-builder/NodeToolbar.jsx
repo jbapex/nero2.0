@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Target, Bot, MessageSquare, BrainCircuit, FileSearch, Paintbrush, Youtube, SearchCode, Globe, BookOpen, FileText } from 'lucide-react';
+import { Users, Target, Bot, MessageSquare, BrainCircuit, FileSearch, Paintbrush, Youtube, SearchCode, Globe, BookOpen, FileText, LayoutGrid, ImageIcon, Palette, Type, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -24,11 +24,22 @@ const NodeToolbar = ({ addNode, isLoadingData }) => {
             ]
         },
         {
+            title: 'Suporte ao Neuro Design',
+            nodes: [
+                { type: 'reference_image', label: 'Imagem de referência', icon: ImageIcon, iconColor: 'text-amber-500' },
+                { type: 'image_logo', label: 'Imagem para logo', icon: ImageIcon, iconColor: 'text-sky-500' },
+                { type: 'colors', label: 'Cores', icon: Palette, iconColor: 'text-rose-500' },
+                { type: 'styles', label: 'Estilos', icon: Type, iconColor: 'text-emerald-500' },
+                { type: 'subject', label: 'Sujeito principal', icon: User, iconColor: 'text-indigo-500' },
+            ]
+        },
+        {
             title: 'Ferramentas Avançadas',
             nodes: [
                 { type: 'planning', label: 'Planejamento', icon: BrainCircuit },
                 { type: 'analysis', label: 'Análise', icon: FileSearch },
                 { type: 'image_generator', label: 'Gerador de Imagem', icon: Paintbrush },
+                { type: 'carousel', label: 'Adicionar Carrossel', icon: LayoutGrid, iconColor: 'text-amber-500' },
                 { type: 'video_transcriber', label: 'Transcritor de Vídeo', icon: Youtube, iconColor: 'text-red-500' },
                 { type: 'page_analyzer', label: 'Analisador de Página', icon: SearchCode, iconColor: 'text-cyan-500' },
                 { type: 'site_creator', label: 'Criador de Site', icon: Globe, iconColor: 'text-green-500' },

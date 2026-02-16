@@ -1,55 +1,251 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect, useCallback, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Paintbrush, Play, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Paintbrush, Play, Loader2, Eye, Expand, Download } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
 import NeuroDesignFlowModal from '@/components/flow-builder/modals/NeuroDesignFlowModal';
+import { mergeFlowInputDataIntoConfig } from '@/lib/neurodesign/flowConfigMerge';
+import { neuroDesignDefaultConfig } from '@/lib/neurodesign/defaultConfig';
+
+const DIMENSION_OPTIONS = [
+  { value: '1:1', label: '1:1' },
+  { value: '4:5', label: '4:5' },
+  { value: '9:16', label: '9:16' },
+  { value: '16:9', label: '16:9' },
+];
+
+const QUALITY_OPTIONS = [
+  { value: '1K', label: '1K' },
+  { value: '2K', label: '2K' },
+  { value: '4K', label: '4K' },
+];
+
+function buildPromptFromInputData(inputData) {
+  if (!inputData || typeof inputData !== 'object') return '';
+  const parts = [];
+  const agentData = inputData.agent?.data;
+  if (agentData && (agentData.generatedText || agentData.text)) {
+    parts.push(String(agentData.generatedText || agentData.text).trim());
+  }
+  const agent2Data = inputData.agent_2?.data;
+  if (agent2Data && (agent2Data.generatedText || agent2Data.text)) {
+    parts.push(String(agent2Data.generatedText || agent2Data.text).trim());
+  }
+  const contentData = inputData.generated_content?.data;
+  if (contentData && typeof contentData === 'string') {
+    parts.push(contentData.trim());
+  }
+  if (inputData.knowledge?.data) {
+    const k = inputData.knowledge.data;
+    parts.push(typeof k === 'string' ? k : JSON.stringify(k, null, 2));
+  }
+  const contexts = inputData.context?.data?.contexts || inputData.context?.data?.client_contexts;
+  if (Array.isArray(contexts) && contexts.length) {
+    const block = contexts
+      .map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || '')))
+      .join('\n\n---\n\n');
+    parts.push(block);
+  }
+  if (inputData.client?.data) {
+    const { client_contexts, ...rest } = inputData.client.data;
+    if (Object.keys(rest).length) parts.push('Cliente: ' + JSON.stringify(rest, null, 2));
+  }
+  if (inputData.campaign?.data) {
+    parts.push('Campanha: ' + JSON.stringify(inputData.campaign.data, null, 2));
+  }
+  return parts.filter(Boolean).join('\n\n');
+}
+
+/** Retorna seções formatadas para exibir no popover "Contexto dos nós" */
+function buildContextSections(inputData) {
+  if (!inputData || typeof inputData !== 'object') return [];
+  const sections = [];
+  if (inputData.client?.data) {
+    const { client_contexts, ...rest } = inputData.client.data;
+    const lines = [];
+    if (rest.name) lines.push(`Nome: ${rest.name}`);
+    if (rest.about) lines.push(`Sobre: ${rest.about}`);
+    if (Object.keys(rest).length > lines.length) {
+      const other = Object.entries(rest).filter(([k]) => !['name', 'about'].includes(k));
+      if (other.length) lines.push(other.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n'));
+    }
+    if (lines.length) sections.push({ title: 'Cliente', content: lines.join('\n') });
+  }
+  if (inputData.campaign?.data) {
+    const c = inputData.campaign.data;
+    const content = typeof c === 'string' ? c : Object.entries(c).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
+    sections.push({ title: 'Campanha', content });
+  }
+  const agentData = inputData.agent?.data;
+  if (agentData && (agentData.generatedText || agentData.text)) {
+    sections.push({ title: 'Texto do agente', content: String(agentData.generatedText || agentData.text).trim() });
+  }
+  const agent2Data = inputData.agent_2?.data;
+  if (agent2Data && (agent2Data.generatedText || agent2Data.text)) {
+    sections.push({ title: 'Texto do agente (2)', content: String(agent2Data.generatedText || agent2Data.text).trim() });
+  }
+  const contentData = inputData.generated_content?.data;
+  if (contentData && typeof contentData === 'string') {
+    sections.push({ title: 'Conteúdo gerado', content: contentData.trim() });
+  }
+  const contexts = inputData.context?.data?.contexts || inputData.context?.data?.client_contexts;
+  if (Array.isArray(contexts) && contexts.length) {
+    const block = contexts.map((c) => (c.name ? `[${c.name}]\n${(c.content || '').slice(0, 500)}${(c.content || '').length > 500 ? '…' : ''}` : (c.content || '').slice(0, 500))).join('\n\n---\n\n');
+    sections.push({ title: 'Contexto / Documentos', content: block });
+  }
+  if (inputData.knowledge?.data) {
+    const k = inputData.knowledge.data;
+    const str = typeof k === 'string' ? k : JSON.stringify(k);
+    sections.push({ title: 'Conhecimento', content: str.length > 400 ? str.slice(0, 400) + '…' : str });
+  }
+  return sections;
+}
 
 const ImageGeneratorNode = memo(({ data, id }) => {
-  const { onUpdateNodeData, presets, inputData, selectedPresetId, expanded } = data;
+  const { onUpdateNodeData, presets, inputData, expanded, onAddImageOutputNode } = data;
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [lastImageUrl, setLastImageUrl] = useState(data.lastImageUrl || null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [dimensions, setDimensions] = useState('1:1');
+  const [imageSize, setImageSize] = useState('1K');
+  const [imageConnections, setImageConnections] = useState([]);
+  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
+  const [project, setProject] = useState(null);
 
-  const campaignId = inputData?.campaign?.id;
+  const contextForApi = useMemo(() => buildPromptFromInputData(inputData), [inputData]);
+  const contextSections = useMemo(() => buildContextSections(inputData), [inputData]);
+  const hasContext = contextSections.length > 0;
 
-  const handlePresetChange = (presetId) => {
-    onUpdateNodeData(id, { selectedPresetId: presetId });
-  };
+  const getOrCreateProject = useCallback(async () => {
+    if (!user) return null;
+    try {
+      const { data: existing, error: fetchError } = await supabase
+        .from('neurodesign_projects')
+        .select('*')
+        .eq('owner_user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fetchError) {
+        toast({ title: 'Erro ao carregar projeto', description: fetchError.message, variant: 'destructive' });
+        return null;
+      }
+      if (existing) {
+        setProject(existing);
+        return existing;
+      }
+      const { data: created, error: insertError } = await supabase
+        .from('neurodesign_projects')
+        .insert({ name: 'Meu projeto', owner_user_id: user.id })
+        .select()
+        .single();
+      if (insertError) {
+        toast({ title: 'Erro ao criar projeto', description: insertError.message, variant: 'destructive' });
+        return null;
+      }
+      setProject(created);
+      return created;
+    } catch (e) {
+      toast({ title: 'Erro', description: e?.message || 'Tabela pode não existir.', variant: 'destructive' });
+      return null;
+    }
+  }, [user, toast]);
 
-  const handleGenerateImage = async () => {
-    if (!campaignId || !selectedPresetId) {
-      toast({ title: 'Atenção', description: 'Conecte uma campanha e selecione um preset.', variant: 'destructive' });
+  const fetchImageConnections = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data: list, error } = await supabase
+        .from('user_ai_connections')
+        .select('id, name, provider, default_model, capabilities, is_active')
+        .eq('user_id', user.id);
+      if (error) return;
+      const filtered = (list || []).filter((c) => c.capabilities?.image_generation && c.is_active !== false);
+      setImageConnections(filtered);
+      setSelectedConnectionId((prev) => {
+        if (filtered.length && (!prev || !filtered.some((c) => c.id === prev))) return filtered[0].id;
+        return prev;
+      });
+    } catch (_e) {
+      setImageConnections([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchImageConnections();
+  }, [fetchImageConnections]);
+
+  const fullPromptForApi = (contextForApi + '\n\n' + (prompt || '').trim()).trim();
+
+  const handleGenerateWithConnection = async () => {
+    if (!selectedConnectionId) {
+      toast({ title: 'Atenção', description: 'Selecione uma conexão de imagem.', variant: 'destructive' });
       return;
     }
+    if (!fullPromptForApi) {
+      toast({ title: 'Atenção', description: 'Conecte nós à esquerda para enviar contexto ou digite o prompt da imagem.', variant: 'destructive' });
+      return;
+    }
+    const proj = project || (await getOrCreateProject());
+    if (!proj) return;
     setIsLoading(true);
     setLastImageUrl(null);
     try {
-      const preset = presets?.find(p => p.id.toString() === selectedPresetId);
-      if (!preset) throw new Error('Preset não encontrado');
-      const { data: functionData, error } = await supabase.functions.invoke('image-generator', {
+      const conn = imageConnections.find((c) => c.id === selectedConnectionId);
+      const isGoogle = conn?.provider?.toLowerCase() === 'google';
+      const fnName = isGoogle ? 'neurodesign-generate-google' : 'neurodesign-generate';
+      const baseConfig = {
+        ...neuroDesignDefaultConfig(),
+        dimensions,
+        image_size: imageSize,
+        user_ai_connection_id: selectedConnectionId,
+        additional_prompt: fullPromptForApi,
+      };
+      const flowOverrides = mergeFlowInputDataIntoConfig(inputData);
+      const config = { ...baseConfig, ...flowOverrides };
+      const { data: result, error } = await supabase.functions.invoke(fnName, {
         body: {
-          campaign_id: parseInt(campaignId),
-          preset_id: parseInt(selectedPresetId),
-          ai_connection_id: preset.ai_connection_id,
-          ai_model_id: preset.ai_model_id,
-          size: preset.tamanho_default || 1024,
-          count: 1,
-          complemento: `Contexto da Campanha: ${JSON.stringify(inputData.campaign?.data || {})}`,
+          projectId: proj.id,
+          configId: null,
+          config,
+          userAiConnectionId: selectedConnectionId,
+          style_reference_only: true,
         },
       });
-      if (error) throw new Error(error.message?.includes(':') ? error.message.split(':')[1] : error.message);
-      if (functionData?.images?.length > 0) {
-        const imageUrl = functionData.images[0].url_publica;
+      const errMsg = result?.error || error?.message;
+      if (error) throw new Error(errMsg || 'Falha ao chamar o servidor de geração.');
+      if (result?.error) throw new Error(result.error);
+      const images = result?.images || [];
+      if (images.length > 0) {
+        const first = images[0];
+        const imageUrl = first.url || first.thumbnail_url;
         setLastImageUrl(imageUrl);
-        onUpdateNodeData(id, { lastImageUrl: imageUrl, output: { id: functionData.job_id, data: functionData.images } });
+        onUpdateNodeData(id, { lastImageUrl: imageUrl, output: { id: result.runId, data: images } });
         toast({ title: 'Imagem gerada com sucesso!' });
+        if (typeof onAddImageOutputNode === 'function') {
+          onAddImageOutputNode(id, imageUrl, { runId: result.runId, images });
+        }
+      } else {
+        toast({ title: 'Geração concluída', description: 'Nenhuma imagem retornada.', variant: 'destructive' });
       }
     } catch (e) {
-      toast({ title: 'Erro ao gerar imagem', description: e.message, variant: 'destructive' });
+      const msg = e?.message || 'Erro ao gerar';
+      const is429 = /429|quota|rate limit/i.test(msg);
+      toast({
+        title: 'Erro ao gerar',
+        description: is429 ? 'Limite de uso da API atingido. Aguarde alguns minutos.' : msg,
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -83,45 +279,162 @@ const ImageGeneratorNode = memo(({ data, id }) => {
   }
 
   return (
-    <Card className="w-64 border-2 border-pink-500/50 shadow-lg">
+    <Card className="w-72 border-2 border-pink-500/50 shadow-lg">
       <Handle type="target" position={Position.Left} className="!bg-pink-500" />
       <CardHeader className="flex-row items-center space-x-2 p-3 bg-pink-500/10">
-        <Paintbrush className="w-5 h-5 text-pink-500" />
+        <Paintbrush className="w-5 h-5 text-pink-500 shrink-0" />
         <CardTitle className="text-base">Gerador de Imagem</CardTitle>
       </CardHeader>
       <CardContent className="p-3 space-y-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-1">
+            <Label className="text-xs">Prompt para a imagem</Label>
+            {hasContext && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Ver contexto dos nós">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto" align="end" side="bottom">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Contexto dos nós conectados</p>
+                  <div className="space-y-3 text-sm">
+                    {contextSections.map((sec, i) => (
+                      <div key={i}>
+                        <p className="font-medium text-foreground mb-1">{sec.title}</p>
+                        <pre className="whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs overflow-x-auto max-h-32 overflow-y-auto">
+                          {sec.content}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={hasContext ? "Descreva a imagem que deseja gerar (o contexto dos nós já será enviado)..." : "Conecte nós à esquerda ou descreva a imagem..."}
+            className="min-h-[56px] text-sm resize-y"
+            disabled={isLoading}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Dimensões</Label>
+            <Select value={dimensions} onValueChange={setDimensions} disabled={isLoading}>
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DIMENSION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Qualidade</Label>
+            <Select value={imageSize} onValueChange={setImageSize} disabled={isLoading}>
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {QUALITY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Conexão (Minha IA)</Label>
+          <Select value={selectedConnectionId || ''} onValueChange={setSelectedConnectionId} disabled={isLoading}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Selecione uma conexão..." />
+            </SelectTrigger>
+            <SelectContent>
+              {imageConnections.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name || c.provider || c.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           onClick={() => onUpdateNodeData(id, { expanded: true })}
-          variant="default"
-          className="w-full bg-pink-600 hover:bg-pink-700"
+          variant="outline"
+          size="sm"
+          className="w-full"
         >
           <Paintbrush className="w-4 h-4 mr-2" />
           Configurar e gerar
         </Button>
-        <Select onValueChange={handlePresetChange} value={selectedPresetId || ''} disabled={isLoading}>
-          <SelectTrigger>
-            <SelectValue placeholder="Preset (geração rápida)..." />
-          </SelectTrigger>
-          <SelectContent>
-            {presets?.map((preset) => (
-              <SelectItem key={preset.id} value={preset.id.toString()}>
-                {preset.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden">
+        <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden relative group">
           {isLoading ? (
             <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
           ) : lastImageUrl ? (
-            <img src={lastImageUrl} alt="Imagem gerada" className="w-full h-full object-cover" />
+            <>
+              <img src={lastImageUrl} alt="Imagem gerada" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewOpen(true)} />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <Button type="button" size="sm" variant="secondary" className="h-8" onClick={() => setPreviewOpen(true)}>
+                  <Expand className="w-4 h-4 mr-1" /> Ver
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-8"
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = lastImageUrl;
+                    a.download = `imagem-gerada-${Date.now()}.png`;
+                    a.click();
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-1" /> Baixar
+                </Button>
+              </div>
+            </>
           ) : (
             <Paintbrush className="w-8 h-8 text-muted-foreground" />
           )}
         </div>
-        <Button onClick={handleGenerateImage} disabled={isLoading || !campaignId || !selectedPresetId} variant="outline" className="w-full">
+        {lastImageUrl && (
+          <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+            <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col">
+              <DialogHeader><DialogTitle>Imagem gerada</DialogTitle></DialogHeader>
+              <div className="flex-1 min-h-0 overflow-auto flex justify-center">
+                <img src={lastImageUrl} alt="Imagem gerada" className="max-w-full max-h-[70vh] object-contain" />
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = lastImageUrl;
+                  a.download = `imagem-gerada-${Date.now()}.png`;
+                  a.click();
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" /> Baixar imagem
+              </Button>
+            </DialogContent>
+          </Dialog>
+        )}
+        <Button
+          onClick={handleGenerateWithConnection}
+          disabled={isLoading || !selectedConnectionId || !fullPromptForApi}
+          variant="default"
+          className="w-full bg-pink-600 hover:bg-pink-700"
+        >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-          Gerar rápido (preset)
+          Gerar
         </Button>
       </CardContent>
       <Handle type="source" position={Position.Right} className="!bg-pink-500" />

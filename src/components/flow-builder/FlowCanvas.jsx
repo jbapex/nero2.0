@@ -14,6 +14,14 @@ import VideoTranscriberNode from '@/components/flow-builder/nodes/VideoTranscrib
 import PageAnalyzerNode from '@/components/flow-builder/nodes/PageAnalyzerNode';
 import SiteCreatorNode from '@/components/flow-builder/nodes/SiteCreatorNode';
 import KnowledgeNode from '@/components/flow-builder/nodes/KnowledgeNode';
+import GeneratedImageNode from '@/components/flow-builder/nodes/GeneratedImageNode';
+import GeneratedContentNode from '@/components/flow-builder/nodes/GeneratedContentNode';
+import CarouselNode from '@/components/flow-builder/nodes/CarouselNode';
+import ReferenceImageNode from '@/components/flow-builder/nodes/ReferenceImageNode';
+import ImageLogoNode from '@/components/flow-builder/nodes/ImageLogoNode';
+import ColorsNode from '@/components/flow-builder/nodes/ColorsNode';
+import StylesNode from '@/components/flow-builder/nodes/StylesNode';
+import SubjectNode from '@/components/flow-builder/nodes/SubjectNode';
 import CustomEdge from '@/components/flow-builder/edges/CustomEdge';
 
 const FlowCanvas = ({
@@ -23,22 +31,33 @@ const FlowCanvas = ({
     onEdgesChange,
     onConnect,
     updateNodeData,
-    onRefreshData, // Pass down the refresh function
+    onAddImageOutputNode,
+    onAddAgentOutputNode,
+    onAddCarouselSlideImageNode,
+    onRefreshData,
 }) => {
     const nodeTypes = useMemo(() => ({
         client: (props) => <ClientNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         context: (props) => <ContextNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         campaign: (props) => <CampaignNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
-        agent: (props) => <AgentNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        agent: (props) => <AgentNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddAgentOutputNode }} />,
         chat: (props) => <ChatNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onRefreshData }} />,
         planning: (props) => <PlanningNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         analysis: (props) => <AnalysisNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
-        image_generator: (props) => <ImageGeneratorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        image_generator: (props) => <ImageGeneratorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddImageOutputNode }} />,
+        generated_image: GeneratedImageNode,
+        generated_content: GeneratedContentNode,
+        carousel: (props) => <CarouselNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddCarouselSlideImageNode }} />,
         video_transcriber: (props) => <VideoTranscriberNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         page_analyzer: (props) => <PageAnalyzerNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         site_creator: (props) => <SiteCreatorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         knowledge: (props) => <KnowledgeNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
-    }), [updateNodeData, onRefreshData]);
+        reference_image: (props) => <ReferenceImageNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        image_logo: (props) => <ImageLogoNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        colors: (props) => <ColorsNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        styles: (props) => <StylesNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+        subject: (props) => <SubjectNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
+    }), [updateNodeData, onAddImageOutputNode, onAddAgentOutputNode, onAddCarouselSlideImageNode, onRefreshData]);
 
     const edgeTypes = useMemo(() => ({
         custom: CustomEdge,

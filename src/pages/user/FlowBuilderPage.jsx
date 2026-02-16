@@ -38,6 +38,9 @@ import React from 'react';
             onConnect,
             updateNodeData,
             addNode,
+            addImageOutputNode,
+            addAgentOutputNode,
+            addCarouselSlideImageNode,
             handleSaveFlow,
             handleNewFlow,
             handleFlowSelect,
@@ -80,7 +83,10 @@ import React from 'react';
                                     onEdgesChange={onEdgesChange}
                                     onConnect={onConnect}
                                     updateNodeData={updateNodeData}
-                                    onRefreshData={flowData.fetchData} // Pass the fetchData function to refresh data
+                                    onAddImageOutputNode={addImageOutputNode}
+                                    onAddAgentOutputNode={addAgentOutputNode}
+                                    onAddCarouselSlideImageNode={addCarouselSlideImageNode}
+                                    onRefreshData={flowData.fetchData}
                                 />
                             </ResizablePanel>
                         </ResizablePanelGroup>

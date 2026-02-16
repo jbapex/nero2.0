@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { NodeResizer } from '@reactflow/node-resizer';
 import '@reactflow/node-resizer/dist/style.css';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Bot, Play, Loader2, Eye, Sparkles, ChevronsUpDown, Settings } from 'lucide-react';
+import { Bot, Play, Loader2, ChevronsUpDown, Settings, FileText } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import ContentViewModal from '@/components/flow-builder/modals/ContentViewModal';
-import RefineWithAiModal from '@/components/flow-builder/modals/RefineWithAiModal';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -62,13 +60,14 @@ const LlmIntegrationSelector = ({ integrations, selectedId, onSelect, disabled }
     );
 };
 
+const ALL_CONTEXTS_ID = '__all__';
+const NONE_CONTEXT_ID = '__none__';
+
 const AgentNode = ({ id, data, isConnectable, selected }) => {
-    const { onUpdateNodeData, modules, inputData, selectedModuleId, optionalText } = data;
-    const { getLlmIntegrations, profile, user } = useAuth();
+    const { onUpdateNodeData, onAddAgentOutputNode, modules, campaigns = [], inputData, selectedModuleId, optionalText, selectedContextId, selectedCampaignId } = data;
+    const { user, profile } = useAuth();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-    const [isRefineModalOpen, setIsRefineModalOpen] = useState(false);
     const [llmIntegrations, setLlmIntegrations] = useState([]);
     const [selectedLlmId, setSelectedLlmId] = useState(data.llm_integration_id || null);
 
@@ -80,11 +79,33 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
         });
     };
 
+    const selectedModule = useMemo(
+        () => (modules || []).find(m => m.id.toString() === selectedModuleId),
+        [modules, selectedModuleId]
+    );
+    const moduleConfig = selectedModule?.config || { use_client: false, use_campaign: true, use_complementary_text: true };
+
+    const clientFromUpstream = inputData?.client?.data;
+    const campaignFromUpstream = inputData?.campaign?.data;
+    const clientContexts = clientFromUpstream?.client_contexts || [];
+    const filteredCampaigns = useMemo(() => {
+        if (!campaigns?.length) return [];
+        const clientId = clientFromUpstream?.id;
+        if (clientId) return campaigns.filter(c => c.client_id?.toString() === clientId.toString());
+        return campaigns;
+    }, [campaigns, clientFromUpstream?.id]);
+
     const handleOptionalTextChange = (e) => {
         onUpdateNodeData(id, { optionalText: e.target.value });
     };
+    const handleContextChange = (value) => {
+        onUpdateNodeData(id, { selectedContextId: value || NONE_CONTEXT_ID });
+    };
+    const handleCampaignChange = (campaignId) => {
+        onUpdateNodeData(id, { selectedCampaignId: campaignId || null });
+    };
 
-    // Fetch AI integrations similar to CampaignCopilot
+    // Fetch AI integrations
     useEffect(() => {
         const fetchIntegrations = async () => {
             if (!user || !profile) return;
@@ -135,11 +156,15 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
 
                 setLlmIntegrations(allIntegrations);
 
-                // Auto-select first available AI if none selected
-                if (!selectedLlmId && allIntegrations.length > 0) {
-                    const defaultIntegration = allIntegrations[0];
-                    setSelectedLlmId(defaultIntegration.id);
-                    onUpdateNodeData(id, { llm_integration_id: defaultIntegration.id });
+                // IA ativa por padrão: preferir a do módulo, senão primeira disponível
+                const currentLlmId = data.llm_integration_id ?? selectedLlmId;
+                if (!currentLlmId && allIntegrations.length > 0) {
+                    const mod = (modules || []).find(m => m.id.toString() === selectedModuleId);
+                    const defaultId = (mod?.llm_integration_id && allIntegrations.some(i => i.id === mod.llm_integration_id))
+                        ? mod.llm_integration_id
+                        : allIntegrations[0].id;
+                    setSelectedLlmId(defaultId);
+                    onUpdateNodeData(id, { llm_integration_id: defaultId });
                 }
             } catch (error) {
                 console.error('Erro ao buscar integrações de IA:', error);
@@ -152,7 +177,7 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
         };
 
         fetchIntegrations();
-    }, [user, profile, selectedLlmId, onUpdateNodeData, id, toast]);
+    }, [user, profile, data.llm_integration_id, selectedLlmId, selectedModuleId, modules, onUpdateNodeData, id, toast]);
 
     const handleSelectLlm = (llmId) => {
         setSelectedLlmId(llmId);
@@ -200,14 +225,25 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
                 userTextForFunction += `\n\nContexto da Transcrição:\n${inputData.video_transcriber.data.transcript_text}`;
             }
 
-            // Get module details for context
-            const selectedModule = modules.find(m => m.id.toString() === selectedModuleId);
-            const modulePrompt = selectedModule?.prompt || '';
+            const modulePrompt = selectedModule?.base_prompt || selectedModule?.prompt || '';
 
-            // Documentos de contexto: nó Contexto tem prioridade; senão vem do nó Cliente
+            // Documentos de contexto: nó Contexto tem prioridade; senão do nó Cliente (filtrar por selectedContextId)
             const contextContexts = inputData?.context?.data?.contexts;
-            const clientContexts = inputData?.client?.data?.client_contexts || [];
-            const contextsToUse = (Array.isArray(contextContexts) && contextContexts.length) ? contextContexts : clientContexts;
+            let clientContextsRaw = inputData?.client?.data?.client_contexts || [];
+            let contextsToUse;
+            if (Array.isArray(contextContexts) && contextContexts.length) {
+                contextsToUse = contextContexts;
+            } else {
+                const ctxId = data.selectedContextId;
+                if (ctxId === NONE_CONTEXT_ID || !ctxId) {
+                    contextsToUse = [];
+                } else if (ctxId === ALL_CONTEXTS_ID) {
+                    contextsToUse = clientContextsRaw;
+                } else {
+                    const one = clientContextsRaw.find(c => c.id?.toString() === ctxId);
+                    contextsToUse = one ? [one] : [];
+                }
+            }
             const contextBlock = contextsToUse.length
               ? contextsToUse.map((c) => (c.name ? `[${c.name}]\n${c.content || ''}` : (c.content || ''))).join('\n\n---\n\n')
               : '';
@@ -217,7 +253,16 @@ const AgentNode = ({ id, data, isConnectable, selected }) => {
 Prompt do Módulo: ${modulePrompt}
 
 Contexto do Cliente: ${inputData?.client?.data ? JSON.stringify({ ...inputData.client.data, client_contexts: undefined }, null, 2) : 'N/A'}
-${contextBlock ? `Documentos de Contexto do Cliente:\n${contextBlock}\n\n` : ''}Contexto da Campanha: ${inputData?.campaign?.data ? JSON.stringify(inputData.campaign.data, null, 2) : 'N/A'}
+${contextBlock ? `Documentos de Contexto do Cliente:\n${contextBlock}\n\n` : ''}Contexto da Campanha: ${(function () {
+                const campaignData = inputData?.campaign?.data;
+                if (campaignData) return JSON.stringify(campaignData, null, 2);
+                const sid = data.selectedCampaignId;
+                if (sid && campaigns?.length) {
+                    const c = campaigns.find(x => x.id?.toString() === sid);
+                    return c ? JSON.stringify(c, null, 2) : 'N/A';
+                }
+                return 'N/A';
+            })()}
 Fonte de Conhecimento: ${inputData?.knowledge?.data ? JSON.stringify(inputData.knowledge.data, null, 2) : 'N/A'}
 
 Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.generatedText}\n\nInstrução: ${refinePrompt}` : userTextForFunction}`;
@@ -249,7 +294,9 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
                         moduleName: selectedModule?.name || 'Agente de IA',
                     }
                 });
-
+                if (typeof onAddAgentOutputNode === 'function') {
+                    onAddAgentOutputNode(id, generatedText, { moduleName: selectedModule?.name || 'Agente de IA' });
+                }
                 toast({
                     title: refinePrompt ? 'Conteúdo Refinado!' : 'Conteúdo Gerado!',
                     description: `O agente "${selectedModule?.name || 'Agente de IA'}" concluiu a tarefa usando ${selectedIntegration.name}.`,
@@ -259,9 +306,10 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
                 console.warn('generic-ai-chat failed, trying generate-content:', genericError);
                 
                 // Fallback to generate-content
+                const campaignId = inputData?.campaign?.id ?? (data.selectedCampaignId && campaigns?.length ? campaigns.find(x => x.id?.toString() === data.selectedCampaignId)?.id : null);
                 const payload = {
                     module_id: selectedModuleId,
-                    campaign_id: inputData?.campaign?.id,
+                    campaign_id: campaignId,
                     client_id: inputData?.client?.id,
                     knowledge_source_id: inputData?.knowledge?.id,
                     user_text: refinePrompt ? `Refine o seguinte texto:\n\n${data.generatedText}\n\nInstrução: ${refinePrompt}` : userTextForFunction,
@@ -281,7 +329,9 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
                         moduleName: functionData.moduleName,
                     }
                 });
-
+                if (typeof onAddAgentOutputNode === 'function') {
+                    onAddAgentOutputNode(id, functionData.generatedText, { moduleName: functionData.moduleName });
+                }
                 toast({
                     title: refinePrompt ? 'Conteúdo Refinado!' : 'Conteúdo Gerado!',
                     description: `O agente "${functionData.moduleName}" concluiu a tarefa.`,
@@ -296,21 +346,19 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
             });
         } finally {
             setIsLoading(false);
-            setIsRefineModalOpen(false);
         }
     };
 
     const isGenerationDisabled = !selectedModuleId || !selectedLlmId || isLoading;
-    const hasContent = data.generatedText && !isLoading;
 
     return (
         <>
             <div className="react-flow__node-default h-full w-full rounded-lg border-2 border-teal-500/50 shadow-lg bg-card text-card-foreground flex flex-col">
                 <NodeResizer 
                     minWidth={320} 
-                    minHeight={400}
+                    minHeight={280}
                     maxWidth={800}
-                    maxHeight={700}
+                    maxHeight={600}
                     isVisible={selected} 
                     lineClassName="border-teal-500"
                     handleClassName="bg-teal-500"
@@ -339,12 +387,12 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
                             ))}
                         </SelectContent>
                     </Select>
-                    
-                    {/* Seletor de IA - aparece apenas quando agente estiver selecionado */}
-                    {selectedModuleId && !profile?.has_custom_ai_access && (
+
+                    {/* Conexão de IA - sempre visível quando há integrações */}
+                    {selectedModuleId && llmIntegrations.length > 0 && (
                         <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md border">
                             <Settings className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">IA:</span>
+                            <Label className="text-sm font-medium text-muted-foreground shrink-0">Conexão de IA</Label>
                             <LlmIntegrationSelector
                                 integrations={llmIntegrations}
                                 selectedId={selectedLlmId}
@@ -353,57 +401,90 @@ Instruções Adicionais: ${refinePrompt ? `Refine o seguinte texto:\n\n${data.ge
                             />
                         </div>
                     )}
-                    
-                    <Textarea
-                        placeholder="Instruções opcionais para a IA..."
-                        value={optionalText || ''}
-                        onChange={handleOptionalTextChange}
-                        className="nodrag h-24 text-sm"
-                        disabled={isLoading}
-                    />
-                    <div className="flex-grow border rounded-md min-h-0 relative">
+
+                    {/* Cliente: só leitura a partir do nó anterior */}
+                    {selectedModuleId && moduleConfig.use_client && (
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Cliente</Label>
+                            {clientFromUpstream ? (
+                                <p className="text-sm font-medium truncate" title={clientFromUpstream.name}>Cliente: {clientFromUpstream.name}</p>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">Conecte um nó Cliente</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Campanha: leitura do nó anterior ou selector */}
+                    {selectedModuleId && moduleConfig.use_campaign && (
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Campanha</Label>
+                            {campaignFromUpstream ? (
+                                <p className="text-sm font-medium truncate" title={campaignFromUpstream.name}>Campanha: {campaignFromUpstream.name}</p>
+                            ) : (
+                                <Select onValueChange={handleCampaignChange} value={selectedCampaignId || ''} disabled={isLoading || !filteredCampaigns.length}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder={filteredCampaigns.length ? "Selecione uma campanha..." : "Conecte um cliente ou escolha..."} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {filteredCampaigns.map((c) => (
+                                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Contexto (opcional) - quando o cliente tem documentos */}
+                    {selectedModuleId && clientContexts.length > 0 && (
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                                <FileText className="w-3 h-3" /> Contexto (opcional)
+                            </Label>
+                            <Select
+                                value={selectedContextId || NONE_CONTEXT_ID}
+                                onValueChange={handleContextChange}
+                                disabled={isLoading}
+                            >
+                                <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Selecione qual contexto usar..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={NONE_CONTEXT_ID}>Nenhum</SelectItem>
+                                    {clientContexts.length > 1 && <SelectItem value={ALL_CONTEXTS_ID}>Todos ({clientContexts.length})</SelectItem>}
+                                    {clientContexts.map((c) => (
+                                        <SelectItem key={c.id} value={String(c.id)}>{c.name || 'Sem título'}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {/* Texto complementar - só se o módulo usar */}
+                    {selectedModuleId && moduleConfig.use_complementary_text && (
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Informações para a IA</Label>
+                            <Textarea
+                                placeholder="Adicione qualquer informação extra para a IA..."
+                                value={optionalText || ''}
+                                onChange={handleOptionalTextChange}
+                                className="nodrag h-20 text-sm resize-y"
+                                disabled={isLoading}
+                            />
+                        </div>
+                    )}
+                    <div className="min-h-[48px] flex items-center justify-center rounded-md border bg-muted/30 p-2">
                         {isLoading ? (
-                            <div className="flex items-center justify-center h-full">
-                                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-                            </div>
+                            <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
+                        ) : data.generatedText ? (
+                            <p className="text-xs text-muted-foreground">Conteúdo enviado para o nó conectado à direita.</p>
                         ) : (
-                            <ScrollArea className="h-full w-full nodrag">
-                                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap p-2 text-left">
-                                    {data.generatedText || "O conteúdo gerado aparecerá aqui."}
-                                </div>
-                            </ScrollArea>
-                        )}
-                         {hasContent && (
-                            <div className="absolute top-2 right-2 flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setIsRefineModalOpen(true)}>
-                                    <Sparkles className="h-4 w-4 text-primary" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setIsViewModalOpen(true)}>
-                                    <Eye className="h-4 w-4" />
-                                </Button>
-                            </div>
+                            <p className="text-xs text-muted-foreground">Clique em Gerar para criar um nó com o resultado.</p>
                         )}
                     </div>
                 </CardContent>
                 <Handle type="source" position={Position.Right} isConnectable={isConnectable} className="w-3 h-3 !bg-teal-500" />
             </div>
-            {hasContent && (
-                <>
-                    <ContentViewModal
-                        isOpen={isViewModalOpen}
-                        onClose={() => setIsViewModalOpen(false)}
-                        title="Visualizar Conteúdo Gerado"
-                        content={data.generatedText}
-                        onRefineClick={() => setIsRefineModalOpen(true)}
-                    />
-                    <RefineWithAiModal
-                        isOpen={isRefineModalOpen}
-                        onClose={() => setIsRefineModalOpen(false)}
-                        onRefine={handleGenerateContent}
-                        isLoading={isLoading}
-                    />
-                </>
-            )}
         </>
     );
 };

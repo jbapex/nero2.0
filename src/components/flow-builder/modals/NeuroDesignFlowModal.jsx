@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 import BuilderPanel from '@/components/neurodesign/BuilderPanel';
 import PreviewPanel from '@/components/neurodesign/PreviewPanel';
+import { mergeFlowInputDataIntoConfig } from '@/lib/neurodesign/flowConfigMerge';
 
 function buildFlowContextText(inputData) {
   if (!inputData || typeof inputData !== 'object') return '';
@@ -35,9 +36,11 @@ function buildFlowContextText(inputData) {
     parts.push('Fonte de conhecimento: ' + JSON.stringify(inputData.knowledge.data, null, 2));
   }
   const agentOutput = inputData.agent?.data;
-  if (agentOutput && (agentOutput.generatedText || agentOutput.text)) {
-    parts.push('Texto do agente: ' + (agentOutput.generatedText || agentOutput.text));
-  }
+  const contentOutput = inputData.generated_content?.data;
+  const agentText = typeof agentOutput === 'string' ? agentOutput : (agentOutput && (agentOutput.generatedText || agentOutput.text));
+  const contentText = typeof contentOutput === 'string' ? contentOutput : null;
+  if (agentText) parts.push('Texto do agente: ' + agentText);
+  if (contentText && !agentText) parts.push('Texto do agente: ' + contentText);
   return parts.join('\n\n');
 }
 
@@ -95,7 +98,7 @@ function normalizeImageSizeVal(v) {
   return null;
 }
 
-const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedded, onCollapse }) => {
+const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedded, onCollapse, initialConfig }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [project, setProject] = useState(null);
@@ -216,7 +219,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
 
   useEffect(() => {
     if (isVisible && project) {
-      setCurrentConfig(null);
+      setCurrentConfig(initialConfig ?? null);
       setSelectedImage(null);
       fetchRuns(project.id);
       fetchImages(project.id);
@@ -226,7 +229,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       setSelectedImage(null);
       setCurrentConfig(null);
     }
-  }, [isVisible, project, fetchRuns, fetchImages]);
+  }, [isVisible, project, initialConfig, fetchRuns, fetchImages]);
 
   const handleGenerate = useCallback(async (config) => {
     if (generatingRef.current) return;
@@ -237,8 +240,9 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
     generatingRef.current = true;
     setIsGenerating(true);
     try {
+      const flowOverrides = mergeFlowInputDataIntoConfig(inputDataSnapshot || {});
       const additionalPrompt = [flowContextText, config.additional_prompt].filter(Boolean).join('\n\n');
-      const configWithContext = { ...config, additional_prompt: additionalPrompt };
+      const configWithContext = { ...config, ...flowOverrides, additional_prompt: additionalPrompt };
       const conn = imageConnections.find((c) => c.id === config?.user_ai_connection_id);
       const isGoogle = conn?.provider?.toLowerCase() === 'google';
       const fnName = isGoogle ? 'neurodesign-generate-google' : 'neurodesign-generate';
@@ -276,7 +280,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       generatingRef.current = false;
       setIsGenerating(false);
     }
-  }, [project, imageConnections, flowContextText, fetchRuns, fetchImages, toast]);
+  }, [project, imageConnections, flowContextText, inputDataSnapshot, fetchRuns, fetchImages, toast]);
 
   const handleRefine = useCallback(async (payload) => {
     if (refiningRef.current) return;

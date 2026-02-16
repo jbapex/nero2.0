@@ -180,7 +180,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { projectId, configId, config, userAiConnectionId } = body as { projectId: string; configId?: string; config: Record<string, unknown>; userAiConnectionId?: string };
+    const { projectId, configId, config, userAiConnectionId, style_reference_only } = body as { projectId: string; configId?: string; config: Record<string, unknown>; userAiConnectionId?: string; style_reference_only?: boolean };
 
     if (!projectId || !config) {
       return new Response(JSON.stringify({ error: "projectId e config são obrigatórios" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -220,9 +220,13 @@ serve(async (req) => {
       if (t) perRefParts.push(`Referência ${i + 1}: copie ${t}.`);
       else perRefParts.push(`Referência ${i + 1}: reproduza o estilo visual geral.`);
     }
-    const styleInstruction = perRefParts.length > 0
+    let styleInstruction = perRefParts.length > 0
       ? "Das imagens de referência anexas (na ordem): " + perRefParts.join(" ") + " A imagem gerada deve ser semelhante ao estilo enviado. "
       : undefined;
+    if (style_reference_only === true && (styleInstruction || styleReferenceUrls.length > 0)) {
+      const base = styleInstruction ?? STYLE_REFERENCE_INSTRUCTION;
+      styleInstruction = base + " Use a referência apenas para estilo visual. Os textos, slogans e logos a exibir são os descritos no prompt abaixo; não copie o texto ou a marca das imagens de referência.";
+    }
     const logoUrl = (config.logo_url && typeof config.logo_url === "string" && config.logo_url.trim()) ? config.logo_url.trim() : undefined;
 
     const runInsert = {
