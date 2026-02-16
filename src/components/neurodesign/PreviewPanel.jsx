@@ -19,7 +19,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
   return (
     <div className="flex flex-col h-full p-4 sm:p-6 min-h-0 max-w-[900px] xl:max-w-[1000px] mx-auto w-full">
-      <div className="flex-1 min-h-0 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 min-h-0 max-h-[70vh] rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
         {isLoading && (
           <div className="flex flex-col items-center gap-4 text-muted-foreground">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -66,9 +66,9 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
 
       {/* Criações deste projeto */}
       {images.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-border min-w-0 flex-shrink-0">
-          <p className="text-xs text-muted-foreground font-medium mb-3">Criações deste projeto</p>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+        <div className="mt-4 pt-3 border-t border-border min-w-0 flex-shrink-0">
+          <p className="text-xs text-muted-foreground font-medium mb-2">Criações deste projeto</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {images.slice(0, 5).map((img) => {
               const url = img.url || img.thumbnail_url;
               const isSelected = selectedImage?.id === img.id;
@@ -76,7 +76,7 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                 <div
                   key={img.id}
                   className={cn(
-                    'aspect-square rounded-lg overflow-hidden border-2 transition-all bg-muted/50',
+                    'w-20 h-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all bg-muted/50',
                     isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
                   )}
                 >

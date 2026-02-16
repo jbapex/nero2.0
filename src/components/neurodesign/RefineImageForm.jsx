@@ -339,7 +339,7 @@ export default function RefineImageForm({
   };
 
   const isBusy = disabled || isUploadingRefine;
-  const previewHeight = compact ? 'max-h-[280px] min-h-[200px]' : 'min-h-[240px]';
+  const previewHeight = compact ? 'max-h-[280px] min-h-[200px]' : 'min-h-[200px] max-h-[40vh]';
 
   if (!imageUrl) {
     return (
