@@ -4,6 +4,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Paintbrush, Play, Loader2, Eye, Expand, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -122,6 +125,7 @@ const ImageGeneratorNode = memo(({ data, id }) => {
   const [imageConnections, setImageConnections] = useState([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
   const [project, setProject] = useState(null);
+  const [lastError, setLastError] = useState(null);
 
   const contextForApi = useMemo(() => buildPromptFromInputData(inputData), [inputData]);
   const contextSections = useMemo(() => buildContextSections(inputData), [inputData]);
@@ -200,6 +204,7 @@ const ImageGeneratorNode = memo(({ data, id }) => {
     if (!proj) return;
     setIsLoading(true);
     setLastImageUrl(null);
+    setLastError(null);
     try {
       const freshInputData = typeof getFreshInputData === 'function' ? getFreshInputData(id) : (inputData || {});
       const conn = imageConnections.find((c) => c.id === selectedConnectionId);
@@ -211,9 +216,21 @@ const ImageGeneratorNode = memo(({ data, id }) => {
         image_size: imageSize,
         user_ai_connection_id: selectedConnectionId,
         additional_prompt: fullPromptForApi,
+        quantity: Math.min(Math.max(Number(data.quantity) || 1, 1), 5),
       };
       const flowOverrides = mergeFlowInputDataIntoConfig(freshInputData);
-      const config = { ...baseConfig, ...flowOverrides };
+      const nodeOverrides = {};
+      if (Array.isArray(data.style_reference_urls) && data.style_reference_urls.length > 0) nodeOverrides.style_reference_urls = data.style_reference_urls;
+      if (Array.isArray(data.style_reference_instructions)) nodeOverrides.style_reference_instructions = data.style_reference_instructions;
+      if (typeof data.logo_url === 'string' && data.logo_url.trim()) nodeOverrides.logo_url = data.logo_url.trim();
+      if (typeof data.ambient_color === 'string' && data.ambient_color.trim()) nodeOverrides.ambient_color = data.ambient_color.trim();
+      if (typeof data.rim_light_color === 'string' && data.rim_light_color.trim()) nodeOverrides.rim_light_color = data.rim_light_color.trim();
+      if (typeof data.fill_light_color === 'string' && data.fill_light_color.trim()) nodeOverrides.fill_light_color = data.fill_light_color.trim();
+      if (data.visual_attributes && typeof data.visual_attributes === 'object') nodeOverrides.visual_attributes = data.visual_attributes;
+      if (data.subject_gender === 'masculino' || data.subject_gender === 'feminino') nodeOverrides.subject_gender = data.subject_gender;
+      if (typeof data.subject_description === 'string' && data.subject_description.trim()) nodeOverrides.subject_description = data.subject_description.trim();
+      if (Array.isArray(data.subject_image_urls) && data.subject_image_urls.length > 0) nodeOverrides.subject_image_urls = data.subject_image_urls.filter((u) => typeof u === 'string' && u.trim()).slice(0, 2);
+      const config = { ...baseConfig, ...flowOverrides, ...nodeOverrides };
       const { data: result, error } = await supabase.functions.invoke(fnName, {
         body: {
           projectId: proj.id,
@@ -232,19 +249,29 @@ const ImageGeneratorNode = memo(({ data, id }) => {
         const imageUrl = first.url || first.thumbnail_url;
         setLastImageUrl(imageUrl);
         onUpdateNodeData(id, { lastImageUrl: imageUrl, output: { id: result.runId, data: images } });
+        setLastError(null);
         toast({ title: 'Imagem gerada com sucesso!' });
         if (typeof onAddImageOutputNode === 'function') {
-          onAddImageOutputNode(id, imageUrl, { runId: result.runId, images });
+          onAddImageOutputNode(id, imageUrl, { runId: result.runId, images, projectId: proj.id, userAiConnectionId: selectedConnectionId });
         }
       } else {
-        toast({ title: 'Geração concluída', description: 'Nenhuma imagem retornada.', variant: 'destructive' });
+        const desc = 'Nenhuma imagem retornada.';
+        setLastError(desc);
+        toast({ title: 'Geração concluída', description: desc, variant: 'destructive' });
       }
     } catch (e) {
       const msg = e?.message || 'Erro ao gerar';
       const is429 = /429|quota|rate limit/i.test(msg);
+      const isNoImages = /sem imagens|bloqueado|SAFETY|sem resultado|não retornou|filtro de conteúdo/i.test(msg);
+      const friendlyDesc = is429
+        ? 'Limite de uso da API atingido. Aguarde alguns minutos.'
+        : isNoImages
+          ? "A API não retornou imagem. Pode ser filtro de conteúdo ou limite. Tente outro prompt, outra conexão ou 'Configurar e gerar' para ajustar referências."
+          : msg;
+      setLastError(friendlyDesc);
       toast({
         title: 'Erro ao gerar',
-        description: is429 ? 'Limite de uso da API atingido. Aguarde alguns minutos.' : msg,
+        description: friendlyDesc,
         variant: 'destructive',
       });
     } finally {
@@ -262,6 +289,28 @@ const ImageGeneratorNode = memo(({ data, id }) => {
     onUpdateNodeData(id, { expanded: false });
   };
 
+  const neuroDesignInitialConfig = useMemo(() => {
+    const base = {
+      ...neuroDesignDefaultConfig(),
+      dimensions,
+      image_size: imageSize,
+      user_ai_connection_id: selectedConnectionId,
+      additional_prompt: fullPromptForApi,
+      quantity: Math.min(Math.max(Number(data.quantity) || 1, 1), 5),
+    };
+    if (Array.isArray(data.style_reference_urls) && data.style_reference_urls.length > 0) base.style_reference_urls = data.style_reference_urls;
+    if (Array.isArray(data.style_reference_instructions)) base.style_reference_instructions = data.style_reference_instructions;
+    if (typeof data.logo_url === 'string' && data.logo_url.trim()) base.logo_url = data.logo_url.trim();
+    if (typeof data.ambient_color === 'string' && data.ambient_color.trim()) base.ambient_color = data.ambient_color.trim();
+    if (typeof data.rim_light_color === 'string' && data.rim_light_color.trim()) base.rim_light_color = data.rim_light_color.trim();
+    if (typeof data.fill_light_color === 'string' && data.fill_light_color.trim()) base.fill_light_color = data.fill_light_color.trim();
+    if (data.visual_attributes && typeof data.visual_attributes === 'object') base.visual_attributes = data.visual_attributes;
+    if (data.subject_gender === 'masculino' || data.subject_gender === 'feminino') base.subject_gender = data.subject_gender;
+    if (typeof data.subject_description === 'string' && data.subject_description.trim()) base.subject_description = data.subject_description.trim();
+    if (Array.isArray(data.subject_image_urls) && data.subject_image_urls.length > 0) base.subject_image_urls = data.subject_image_urls.filter((u) => typeof u === 'string' && u.trim()).slice(0, 2);
+    return base;
+  }, [dimensions, imageSize, selectedConnectionId, fullPromptForApi, data.quantity, data.style_reference_urls, data.style_reference_instructions, data.logo_url, data.ambient_color, data.rim_light_color, data.fill_light_color, data.visual_attributes, data.subject_gender, data.subject_description, data.subject_image_urls]);
+
   if (expanded) {
     return (
       <Card className="min-w-[920px] w-[920px] border-2 border-pink-500/50 shadow-lg flex flex-col overflow-hidden" style={{ height: '720px' }}>
@@ -271,6 +320,7 @@ const ImageGeneratorNode = memo(({ data, id }) => {
             embedded
             onCollapse={handleCollapse}
             inputData={inputData}
+            initialConfig={neuroDesignInitialConfig}
             onResult={handleNeuroDesignResult}
           />
         </div>
@@ -368,6 +418,116 @@ const ImageGeneratorNode = memo(({ data, id }) => {
             </SelectContent>
           </Select>
         </div>
+        <Accordion type="single" collapsible className="w-full border rounded-md px-2">
+          <AccordionItem value="advanced" className="border-0">
+            <AccordionTrigger className="py-2 text-xs font-medium">Configurações avançadas</AccordionTrigger>
+            <AccordionContent className="pt-0 pb-2 space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Quantidade de imagens</Label>
+                <Select
+                  value={String(data.quantity ?? 1)}
+                  onValueChange={(v) => onUpdateNodeData(id, { quantity: Math.min(Math.max(Number(v), 1), 5) })}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Referência de estilo (URL)</Label>
+                <Input
+                  placeholder="https://..."
+                  value={Array.isArray(data.style_reference_urls) && data.style_reference_urls[0] ? data.style_reference_urls[0] : ''}
+                  onChange={(e) => onUpdateNodeData(id, { style_reference_urls: e.target.value.trim() ? [e.target.value.trim()] : [] })}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+                <Input
+                  placeholder="Instrução para a referência (opcional)"
+                  value={Array.isArray(data.style_reference_instructions) && data.style_reference_instructions[0] != null ? data.style_reference_instructions[0] : ''}
+                  onChange={(e) => onUpdateNodeData(id, { style_reference_instructions: [e.target.value.trim()] })}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">URL da logo</Label>
+                <Input
+                  placeholder="https://..."
+                  value={typeof data.logo_url === 'string' ? data.logo_url : ''}
+                  onChange={(e) => onUpdateNodeData(id, { logo_url: e.target.value.trim() || undefined })}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cores (ambiente, rim, preenchimento)</Label>
+                <div className="grid grid-cols-3 gap-1">
+                  <Input placeholder="Ambiente" value={data.ambient_color ?? ''} onChange={(e) => onUpdateNodeData(id, { ambient_color: e.target.value.trim() || undefined })} className="h-8 text-xs" disabled={isLoading} />
+                  <Input placeholder="Rim" value={data.rim_light_color ?? ''} onChange={(e) => onUpdateNodeData(id, { rim_light_color: e.target.value.trim() || undefined })} className="h-8 text-xs" disabled={isLoading} />
+                  <Input placeholder="Preench." value={data.fill_light_color ?? ''} onChange={(e) => onUpdateNodeData(id, { fill_light_color: e.target.value.trim() || undefined })} className="h-8 text-xs" disabled={isLoading} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Estilo</Label>
+                <Input
+                  placeholder="Tags (ex.: minimalista, elegante)"
+                  value={Array.isArray(data.visual_attributes?.style_tags) ? data.visual_attributes.style_tags.join(', ') : ''}
+                  onChange={(e) => {
+                    const tags = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
+                    onUpdateNodeData(id, { visual_attributes: { ...(data.visual_attributes || {}), style_tags: tags } });
+                  }}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+                <label className="flex items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={Boolean(data.visual_attributes?.ultra_realistic)}
+                    onCheckedChange={(checked) => onUpdateNodeData(id, { visual_attributes: { ...(data.visual_attributes || {}), ultra_realistic: !!checked } })}
+                    disabled={isLoading}
+                  />
+                  Ultra realista
+                </label>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Sujeito</Label>
+                <Select
+                  value={data.subject_gender === 'masculino' || data.subject_gender === 'feminino' ? data.subject_gender : ''}
+                  onValueChange={(v) => onUpdateNodeData(id, { subject_gender: v === 'masculino' || v === 'feminino' ? v : undefined })}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Gênero (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feminino">Feminino</SelectItem>
+                    <SelectItem value="masculino">Masculino</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Descrição do sujeito"
+                  value={typeof data.subject_description === 'string' ? data.subject_description : ''}
+                  onChange={(e) => onUpdateNodeData(id, { subject_description: e.target.value.trim() || undefined })}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+                <Input
+                  placeholder="URL da imagem do sujeito"
+                  value={Array.isArray(data.subject_image_urls) && data.subject_image_urls[0] ? data.subject_image_urls[0] : ''}
+                  onChange={(e) => onUpdateNodeData(id, { subject_image_urls: e.target.value.trim() ? [e.target.value.trim()] : [] })}
+                  className="h-8 text-xs"
+                  disabled={isLoading}
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <Button
           onClick={() => onUpdateNodeData(id, { expanded: true })}
           variant="outline"
@@ -437,6 +597,9 @@ const ImageGeneratorNode = memo(({ data, id }) => {
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
           Gerar
         </Button>
+        {lastError && (
+          <p className="text-xs text-destructive mt-1 text-center">{lastError}</p>
+        )}
       </CardContent>
       <Handle type="source" position={Position.Right} className="!bg-pink-500" />
     </Card>

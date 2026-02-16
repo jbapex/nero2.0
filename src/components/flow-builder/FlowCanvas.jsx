@@ -46,7 +46,7 @@ const FlowCanvas = ({
         planning: (props) => <PlanningNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         analysis: (props) => <AnalysisNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         image_generator: (props) => <ImageGeneratorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddImageOutputNode, getFreshInputData }} />,
-        generated_image: GeneratedImageNode,
+        generated_image: (props) => <GeneratedImageNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         generated_content: GeneratedContentNode,
         carousel: (props) => <CarouselNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddCarouselSlideImageNode, getFreshInputData }} />,
         video_transcriber: (props) => <VideoTranscriberNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,

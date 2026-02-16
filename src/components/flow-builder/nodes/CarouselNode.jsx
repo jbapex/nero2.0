@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { LayoutGrid, Settings2, ImageIcon, ChevronDown, ChevronRight, Sparkles, Play, Loader2, Paintbrush, Expand, Download, SlidersHorizontal } from 'lucide-react';
+import { LayoutGrid, Settings2, ImageIcon, ChevronDown, ChevronRight, Sparkles, Play, Loader2, Paintbrush, Expand, Download, SlidersHorizontal, Pencil } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { mergeFlowInputDataIntoConfig, filterOverridesByDisabledSupportTypes } from '@/lib/neurodesign/flowConfigMerge';
 import { neuroDesignDefaultConfig } from '@/lib/neurodesign/defaultConfig';
 import NeuroDesignFlowModal from '@/components/flow-builder/modals/NeuroDesignFlowModal';
+import RefineImageModal from '@/components/flow-builder/modals/RefineImageModal';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -285,6 +286,8 @@ const CarouselNode = memo(({ data, id }) => {
   const [slideIndexForNeuroDesign, setSlideIndexForNeuroDesign] = useState(null);
   const [slidePreviewIndex, setSlidePreviewIndex] = useState(null);
   const [popoverSlideIndex, setPopoverSlideIndex] = useState(null);
+  const [refineModalOpen, setRefineModalOpen] = useState(false);
+  const [refineSlideIndex, setRefineSlideIndex] = useState(null);
   const [localOrientations, setLocalOrientations] = useState(() => {
     const base = orientations.length >= numSlides ? orientations : [...orientations];
     while (base.length < numSlides) base.push('');
@@ -689,12 +692,15 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
         if (images.length > 0) {
           const first = images[0];
           const imageUrl = first.url || first.thumbnail_url;
+          const runId = result.runId;
+          const imageId = first.id;
+          const projectId = proj.id;
           const newSlides = [...slides];
           const existing = newSlides[slideIndex] || {};
-          newSlides[slideIndex] = { ...existing, imageUrl, prompt: existing.prompt ?? slidePrompt };
+          newSlides[slideIndex] = { ...existing, imageUrl, prompt: existing.prompt ?? slidePrompt, runId, imageId, projectId };
           onUpdateNodeData(id, { slides: newSlides });
           if (typeof onAddCarouselSlideImageNode === 'function') {
-            onAddCarouselSlideImageNode(id, `slide-${slideIndex}`, imageUrl, { runId: result.runId, images });
+            onAddCarouselSlideImageNode(id, `slide-${slideIndex}`, imageUrl, { runId, images, projectId, userAiConnectionId: selectedImageConnectionId });
           }
           toast({ title: 'Imagem gerada com sucesso!' });
         } else {
@@ -948,6 +954,21 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
                           <Play className="w-4 h-4" />
                         )}
                       </Button>
+                      {slide.imageUrl && slide.runId && slide.imageId && slide.projectId && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 shrink-0"
+                          onClick={() => {
+                            setRefineSlideIndex(i);
+                            setRefineModalOpen(true);
+                          }}
+                          title="Refinar imagem"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Handle
                         type="source"
                         id={`slide-${i}`}
@@ -975,6 +996,27 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
         inputData={inputData}
         onResult={handleNeuroDesignResult}
         initialConfig={neuroDesignInitialConfig}
+      />
+
+      <RefineImageModal
+        open={refineModalOpen}
+        onOpenChange={(open) => {
+          setRefineModalOpen(open);
+          if (!open) setRefineSlideIndex(null);
+        }}
+        imageUrl={refineSlideIndex != null ? slides[refineSlideIndex]?.imageUrl : undefined}
+        projectId={refineSlideIndex != null ? slides[refineSlideIndex]?.projectId : undefined}
+        runId={refineSlideIndex != null ? slides[refineSlideIndex]?.runId : undefined}
+        imageId={refineSlideIndex != null ? slides[refineSlideIndex]?.imageId : undefined}
+        userAiConnectionId={selectedImageConnectionId}
+        imageConnections={imageConnections}
+        onSuccess={({ imageUrl, runId: newRunId, imageId: newImageId }) => {
+          if (refineSlideIndex == null) return;
+          const newSlides = slides.map((s, idx) =>
+            idx !== refineSlideIndex ? s : { ...s, imageUrl, runId: newRunId, imageId: newImageId }
+          );
+          onUpdateNodeData(id, { slides: newSlides });
+        }}
       />
 
       {slidePreviewIndex != null && slides[slidePreviewIndex]?.imageUrl && (

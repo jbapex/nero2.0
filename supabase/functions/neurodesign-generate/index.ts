@@ -128,14 +128,14 @@ async function generateWithOpenRouter(
   const message = data?.choices?.[0]?.message;
   const images = message?.images;
   if (!Array.isArray(images) || images.length === 0) {
-    throw new Error("Nenhuma imagem na resposta OpenRouter");
+    throw new Error("A API não retornou imagens. Pode ser filtro de conteúdo ou limite do modelo. Tente outro prompt ou conexão.");
   }
   const urls: { url: string }[] = [];
   for (const img of images.slice(0, Math.min(quantity, 5))) {
     const urlStr = img.image_url?.url ?? img.imageUrl?.url;
     if (urlStr) urls.push({ url: urlStr });
   }
-  if (urls.length === 0) throw new Error("Resposta OpenRouter sem URLs de imagem");
+  if (urls.length === 0) throw new Error("A API não retornou imagens. Tente outro prompt ou conexão.");
   return urls;
 }
 
@@ -212,12 +212,27 @@ async function generateWithGoogleGemini(
     throw new Error(`Gemini ${res.status}: ${text.slice(0, 300)}`);
   }
   const data = (await res.json()) as {
+    promptFeedback?: { blockReason?: string };
     candidates?: Array<{
+      finishReason?: string;
       content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> };
     }>;
   };
-  const parts = data?.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(parts)) throw new Error("Resposta Gemini sem parts");
+  const blockReason = data?.promptFeedback?.blockReason;
+  if (blockReason && blockReason !== "BLOCK_REASON_UNSPECIFIED") {
+    throw new Error("O prompt foi bloqueado pelo filtro de segurança. Tente outro texto ou remova referências sensíveis.");
+  }
+  const candidates = data?.candidates;
+  if (!candidates || candidates.length === 0) {
+    throw new Error("A geração foi bloqueada ou não retornou resultado. Tente outro prompt ou referência.");
+  }
+  const firstCandidate = candidates[0];
+  const finishReason = firstCandidate?.finishReason;
+  if (finishReason === "SAFETY" || finishReason === "RECITATION" || finishReason === "BLOCKED") {
+    throw new Error("A geração foi bloqueada (conteúdo sensível). Tente outro prompt ou referência.");
+  }
+  const parts = firstCandidate?.content?.parts;
+  if (!Array.isArray(parts)) throw new Error("A API não retornou conteúdo de imagem. Tente outro prompt ou conexão.");
   const urls: { url: string }[] = [];
   for (const part of parts) {
     const inline = part.inlineData;
@@ -227,7 +242,7 @@ async function generateWithGoogleGemini(
       if (urls.length >= Math.min(quantity, 5)) break;
     }
   }
-  if (urls.length === 0) throw new Error("Resposta Gemini sem imagens");
+  if (urls.length === 0) throw new Error("A API não retornou imagens. Pode ser filtro de conteúdo ou limite. Tente outro prompt ou conexão.");
   return urls;
 }
 
@@ -294,6 +309,13 @@ serve(async (req) => {
       else promptToUse = priority + prompt;
     }
     const logoUrl = (config.logo_url && typeof config.logo_url === "string" && config.logo_url.trim()) ? config.logo_url.trim() : undefined;
+
+    if (!promptToUse || !promptToUse.trim()) {
+      return new Response(
+        JSON.stringify({ error: "O prompt está vazio. Preencha a descrição da imagem ou conecte nós com contexto." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     let providerLabel = "mock";
     const runInsert = {
