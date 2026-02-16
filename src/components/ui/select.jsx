@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,13 +25,43 @@ const useSelectContext = () => {
 const TriggerWrapper = React.forwardRef(({ asChild, ...props }, ref) => <div ref={ref} {...props} />);
 TriggerWrapper.displayName = 'TriggerWrapper';
 
+// Helper to collect SelectItem-like nodes (value + children) from React children
+function collectSelectItems(children) {
+  const items = [];
+  React.Children.forEach(children, (child) => {
+    if (!child || typeof child !== 'object') return;
+    if (child.props?.value != null) {
+      items.push({ value: child.props.value, children: child.props.children });
+    }
+    if (child.props?.children) {
+      items.push(...collectSelectItems(React.Children.toArray(child.props.children)));
+    }
+  });
+  return items;
+}
+
 const Select = (props) => {
   const isDesktop = useMediaQuery('(min-width: 768px)');
-  
+  const [selectedLabel, setSelectedLabel] = useState(null);
+
   const contextValue = React.useMemo(() => ({
     isDesktop,
     ...props,
-  }), [isDesktop, props]);
+    ...(isDesktop ? {} : { selectedLabel, setSelectedLabel }),
+  }), [isDesktop, props, selectedLabel, setSelectedLabel]);
+
+  // On mobile: derive selected label from value and SelectContent's SelectItem children
+  useEffect(() => {
+    if (isDesktop) return;
+    const { value, children } = props;
+    const contentChild = React.Children.toArray(children).find(
+      (c) => c?.type?.displayName === 'SelectContent'
+    );
+    const contentChildren = contentChild?.props?.children;
+    const items = contentChildren ? collectSelectItems(React.Children.toArray(contentChildren)) : [];
+    const selected = items.find((i) => String(i.value) === String(value));
+    setSelectedLabel(selected?.children ?? null);
+  }, [isDesktop, props.value]);
 
   if (isDesktop) {
     return (
@@ -116,9 +146,10 @@ const SelectContent = React.forwardRef(({ className, children, position = 'poppe
 SelectContent.displayName = 'SelectContent';
 
 const SelectItem = React.forwardRef(({ className, children, value, ...props }, ref) => {
-  const { isDesktop, onValueChange, onOpenChange } = useSelectContext();
+  const { isDesktop, onValueChange, onOpenChange, setSelectedLabel } = useSelectContext();
   
   const handleSelect = () => {
+    if (setSelectedLabel) setSelectedLabel(children);
     if (onValueChange) {
       onValueChange(value);
     }
@@ -167,20 +198,17 @@ const SelectItem = React.forwardRef(({ className, children, value, ...props }, r
 SelectItem.displayName = 'SelectItem';
 
 const SelectValue = React.forwardRef(({ className, placeholder, children, ...props }, ref) => {
-  const { isDesktop, value } = useSelectContext();
+  const { isDesktop, selectedLabel } = useSelectContext();
   
   if (isDesktop) {
     return <SelectPrimitive.Value ref={ref} className={className} placeholder={placeholder} {...props} />;
   }
 
-  // For mobile drawer, find the selected child to display its content
-  const selectedChild = React.Children.toArray(children).find(
-    (child) => child.props.value === value
-  );
-
+  // On mobile drawer, display the label stored in context (set from SelectItem or derived from value)
+  const display = selectedLabel != null && selectedLabel !== '' ? selectedLabel : placeholder;
   return (
-    <span ref={ref} className={className} {...props}>
-      {selectedChild ? selectedChild.props.children : placeholder}
+    <span ref={ref} className={cn(className, !display && 'text-muted-foreground')} {...props}>
+      {display}
     </span>
   );
 });

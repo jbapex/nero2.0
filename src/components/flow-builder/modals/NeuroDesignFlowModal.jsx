@@ -14,6 +14,7 @@ import BuilderPanel from '@/components/neurodesign/BuilderPanel';
 import PreviewPanel from '@/components/neurodesign/PreviewPanel';
 import { mergeFlowInputDataIntoConfig } from '@/lib/neurodesign/flowConfigMerge';
 import { neuroDesignDefaultConfig } from '@/lib/neurodesign/defaultConfig';
+import { uploadNeuroDesignFile } from '@/lib/neurodesignStorage';
 
 function buildFlowContextText(inputData) {
   if (!inputData || typeof inputData !== 'object') return '';
@@ -113,6 +114,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
   const [llmConnections, setLlmConnections] = useState([]);
   const [selectedLlmId, setSelectedLlmId] = useState(null);
   const [isFillingFromPrompt, setIsFillingFromPrompt] = useState(false);
+  const [uploadedRefineImage, setUploadedRefineImage] = useState(null);
   const generatingRef = useRef(false);
   const refiningRef = useRef(false);
 
@@ -298,14 +300,22 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
 
   const handleRefine = useCallback(async (payload) => {
     if (refiningRef.current) return;
-    if (!project || !selectedImage?.id) {
-      toast({ title: 'Selecione uma imagem para refinar', variant: 'destructive' });
+    if (!project) {
+      toast({ title: 'Projeto não carregado', variant: 'destructive' });
       return;
     }
-    const runId = selectedImage.run_id || runs.find((r) => r.id && images.some((i) => i.run_id === r.id && i.id === selectedImage.id))?.id;
-    if (!runId) {
-      toast({ title: 'Execução não encontrada', variant: 'destructive' });
+    const useUploadedSource = uploadedRefineImage?.file;
+    if (!useUploadedSource && !selectedImage?.id) {
+      toast({ title: 'Selecione uma imagem da galeria ou adicione uma imagem para refinar', variant: 'destructive' });
       return;
+    }
+    let runId = null;
+    if (!useUploadedSource) {
+      runId = selectedImage.run_id || runs.find((r) => r.id && images.some((i) => i.run_id === r.id && i.id === selectedImage.id))?.id;
+      if (!runId) {
+        toast({ title: 'Execução não encontrada', variant: 'destructive' });
+        return;
+      }
     }
     const instruction = typeof payload === 'string' ? payload : payload?.instruction ?? '';
     const configOverrides = typeof payload === 'object' && payload !== null ? payload.configOverrides : undefined;
@@ -322,14 +332,22 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
     refiningRef.current = true;
     setIsRefining(true);
     try {
+      let sourceImageUrlForBody = null;
+      if (useUploadedSource && user?.id) {
+        sourceImageUrlForBody = await uploadNeuroDesignFile(user.id, project.id, 'refine_source', uploadedRefineImage.file);
+      }
       const body = {
         projectId: project.id,
-        runId,
-        imageId: selectedImage.id,
         instruction,
         configOverrides,
         userAiConnectionId: currentConfig?.user_ai_connection_id || null,
       };
+      if (sourceImageUrlForBody) {
+        body.sourceImageUrl = sourceImageUrlForBody;
+      } else {
+        body.runId = runId;
+        body.imageId = selectedImage.id;
+      }
       if (referenceImageUrl) body.referenceImageUrl = referenceImageUrl;
       if (replacementImageUrl) body.replacementImageUrl = replacementImageUrl;
       if (addImageUrl) body.addImageUrl = addImageUrl;
@@ -356,6 +374,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
           project_id: project.id,
         }));
         setSelectedImage(withIds[0]);
+        setUploadedRefineImage(null);
         setImages((prev) => [...withIds, ...prev.filter((p) => !withIds.some((w) => w.id === p.id))].slice(0, 5));
         toast({ title: 'Imagem refinada com sucesso!' });
         fetchRuns(project.id).catch(() => {});
@@ -368,7 +387,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       refiningRef.current = false;
       setIsRefining(false);
     }
-  }, [project, selectedImage, runs, images, currentConfig, imageConnections, fetchRuns, fetchImages, toast]);
+  }, [project, selectedImage, runs, images, currentConfig, imageConnections, uploadedRefineImage, user, fetchRuns, fetchImages, toast]);
 
   const handleFillFromPrompt = useCallback(async (pastedText) => {
     const trimmed = (pastedText || '').trim();
@@ -519,7 +538,7 @@ Responda somente com o JSON.`;
               <p className="text-xs text-muted-foreground mt-1">Conecte Cliente, Contexto ou Campanha para enriquecer o prompt.</p>
             </div>
           )}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0 min-w-0">
             <BuilderPanel
               project={project}
               config={currentConfig}
@@ -543,7 +562,10 @@ Responda somente com o JSON.`;
             isRefining={isRefining}
             onRefine={handleRefine}
             onDownload={downloadHandler}
-            onSelectImage={setSelectedImage}
+            onSelectImage={(img) => { setSelectedImage(img); setUploadedRefineImage(null); }}
+            uploadedRefineImage={uploadedRefineImage}
+            onUploadImageForRefine={(file) => setUploadedRefineImage({ file, previewUrl: URL.createObjectURL(file) })}
+            onClearUploadedRefineImage={() => setUploadedRefineImage(null)}
             hasImageConnection={!!(currentConfig?.user_ai_connection_id && currentConfig.user_ai_connection_id !== 'none')}
           />
         </div>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Loader2, Download, Sparkles, Maximize2, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Loader2, Download, Sparkles, Maximize2, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,12 +10,21 @@ import RefineImageForm from '@/components/neurodesign/RefineImageForm';
 
 const isDemoPlaceholder = (url) => url && typeof url === 'string' && url.includes('placehold.co');
 
-const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage, hasImageConnection = true }) => {
+const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRefining, onRefine, onDownload, onSelectImage, uploadedRefineImage, onUploadImageForRefine, onClearUploadedRefineImage, hasImageConnection = true }) => {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const uploadInputRef = useRef(null);
 
-  const imageUrl = selectedImage?.url || selectedImage?.thumbnail_url;
+  const imageUrl = uploadedRefineImage?.previewUrl || selectedImage?.url || selectedImage?.thumbnail_url;
   const isLoading = isGenerating || isRefining;
   const showDemoNotice = !isLoading && imageUrl && isDemoPlaceholder(imageUrl);
+  const isUploadedSource = !!uploadedRefineImage;
+
+  const handleUploadChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !/^image\/(jpeg|png|webp|gif)/i.test(file.type)) return;
+    onUploadImageForRefine?.(file);
+    e.target.value = '';
+  };
 
   return (
     <div className="flex flex-col h-full p-4 sm:p-6 min-h-0 max-w-[900px] xl:max-w-[1000px] mx-auto w-full">
@@ -33,10 +42,25 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
             </div>
             <p className="font-medium">Aguardando criação</p>
             <p className="text-sm">Configure o builder à esquerda e clique em &quot;Gerar Imagem&quot;.</p>
+            {onUploadImageForRefine && (
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground mb-2">Ou adicione uma imagem para refinar:</p>
+                <input ref={uploadInputRef} type="file" accept="image/*" className="sr-only" aria-hidden onChange={handleUploadChange} />
+                <Button type="button" variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" /> Adicionar imagem para refinar
+                </Button>
+              </div>
+            )}
           </div>
         )}
         {!isLoading && imageUrl && (
-          <div className="w-full h-full flex flex-col p-4 overflow-y-auto min-h-0">
+          <div className="w-full h-full flex flex-col p-4 overflow-y-auto min-h-0 min-w-0">
+            {isUploadedSource && onClearUploadedRefineImage && (
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">Imagem adicionada para refinar</span>
+                <Button type="button" variant="ghost" size="sm" onClick={onClearUploadedRefineImage}>Usar outra imagem</Button>
+              </div>
+            )}
             <RefineImageForm
               imageUrl={imageUrl}
               projectId={project?.id}
@@ -49,9 +73,11 @@ const PreviewPanel = ({ project, user, selectedImage, images, isGenerating, isRe
                   <Button size="sm" variant="secondary" onClick={() => setFullscreenOpen(true)}>
                     <Maximize2 className="h-4 w-4 mr-1" /> Tela cheia
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => onDownload?.(imageUrl)}>
-                    <Download className="h-4 w-4 mr-1" /> Download
-                  </Button>
+                  {!isUploadedSource && (
+                    <Button size="sm" variant="secondary" onClick={() => onDownload?.(imageUrl)}>
+                      <Download className="h-4 w-4 mr-1" /> Download
+                    </Button>
+                  )}
                 </>
               )}
             />

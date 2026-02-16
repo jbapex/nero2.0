@@ -128,6 +128,7 @@ serve(async (req) => {
       projectId,
       runId,
       imageId,
+      sourceImageUrl: sourceImageUrlFromBody,
       instruction,
       configOverrides,
       userAiConnectionId,
@@ -142,8 +143,9 @@ serve(async (req) => {
       selectionFontStyle,
     } = body as {
       projectId: string;
-      runId: string;
-      imageId: string;
+      runId?: string;
+      imageId?: string;
+      sourceImageUrl?: string;
       instruction?: string;
       configOverrides?: Record<string, unknown>;
       userAiConnectionId?: string;
@@ -170,8 +172,12 @@ serve(async (req) => {
       addImageUrl ||
       region ||
       (dimensionsOverride && dimensionsOverride !== "1:1");
-    if (!projectId || !runId || !imageId) {
-      return new Response(JSON.stringify({ error: "projectId, runId e imageId são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const useUploadedSource = typeof sourceImageUrlFromBody === "string" && sourceImageUrlFromBody.trim().length > 0;
+    if (!projectId) {
+      return new Response(JSON.stringify({ error: "projectId é obrigatório" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!useUploadedSource && (!runId || !imageId)) {
+      return new Response(JSON.stringify({ error: "Envie runId e imageId ou sourceImageUrl (imagem enviada para refinar)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!hasAnyAction) {
       return new Response(JSON.stringify({ error: "Envie ao menos uma ação: instrução, referência de arte, imagem para substituir, imagem para adicionar na cena ou região selecionada" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -186,19 +192,30 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Projeto não encontrado ou acesso negado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: sourceImage, error: imgError } = await supabase
-      .from("neurodesign_generated_images")
-      .select("id, url, thumbnail_url, project_id")
-      .eq("id", imageId)
-      .eq("project_id", projectId)
-      .single();
-    if (imgError || !sourceImage?.url) {
-      return new Response(JSON.stringify({ error: "Imagem não encontrada" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    let sourceImageUrl: string;
+    let configIdForRun: string | null = null;
+    let parentRunIdForRun: string | null = null;
 
-    const { data: existingRun } = await supabase.from("neurodesign_generation_runs").select("id, config_id").eq("id", runId).eq("project_id", projectId).single();
-    if (!existingRun) {
-      return new Response(JSON.stringify({ error: "Execução não encontrada" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (useUploadedSource) {
+      sourceImageUrl = (sourceImageUrlFromBody as string).trim();
+    } else {
+      const { data: sourceImage, error: imgError } = await supabase
+        .from("neurodesign_generated_images")
+        .select("id, url, thumbnail_url, project_id")
+        .eq("id", imageId)
+        .eq("project_id", projectId)
+        .single();
+      if (imgError || !sourceImage?.url) {
+        return new Response(JSON.stringify({ error: "Imagem não encontrada" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      sourceImageUrl = sourceImage.url || sourceImage.thumbnail_url;
+
+      const { data: existingRun } = await supabase.from("neurodesign_generation_runs").select("id, config_id").eq("id", runId).eq("project_id", projectId).single();
+      if (!existingRun) {
+        return new Response(JSON.stringify({ error: "Execução não encontrada" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      configIdForRun = existingRun.config_id;
+      parentRunIdForRun = runId;
     }
 
     const { data: conn, error: connError } = await supabase
@@ -213,11 +230,11 @@ serve(async (req) => {
 
     const runInsert = {
       project_id: projectId,
-      config_id: existingRun.config_id,
+      config_id: configIdForRun,
       type: "refine",
       status: "running",
       provider: "google",
-      parent_run_id: runId,
+      parent_run_id: parentRunIdForRun,
       refine_instruction: instructionTrimmed,
       provider_request_json: {
         instruction: instructionTrimmed,
@@ -238,7 +255,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: runError?.message || "Erro ao criar run de refino" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const sourceImageUrl = sourceImage.url || sourceImage.thumbnail_url;
     const imageUrls: string[] = [sourceImageUrl];
     let textPrompt: string;
 
@@ -335,6 +351,14 @@ serve(async (req) => {
     const aspectRatioForPrompt = getAspectRatio(dimensionsForApi);
     if (aspectRatioForPrompt && aspectRatioForPrompt !== "1:1") {
       textPrompt = (textPrompt + ` Important: output the image in ${aspectRatioForPrompt} aspect ratio.`).trim();
+    }
+    const colorOverrides = [
+      (configOverrides?.ambient_color as string)?.trim(),
+      (configOverrides?.rim_light_color as string)?.trim(),
+      (configOverrides?.fill_light_color as string)?.trim(),
+    ].filter((c): c is string => typeof c === "string" && c.length > 0);
+    if (colorOverrides.length > 0) {
+      textPrompt = (textPrompt + ` Iluminação e cores a aplicar: ${colorOverrides.join(", ")}.`).trim();
     }
 
     const resolvedImageUrls: string[] = [];

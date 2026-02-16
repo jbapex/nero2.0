@@ -4,7 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { uploadNeuroDesignFile } from '@/lib/neurodesignStorage';
+
+function hexToColorInput(hex) {
+  if (!hex || typeof hex !== 'string') return '#808080';
+  const s = hex.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s.toLowerCase();
+  if (/^[0-9a-fA-F]{3}$/.test(s)) return '#' + s.toLowerCase().split('').map((c) => c + c).join('');
+  return '#808080';
+}
+
+function normalizeHexInput(raw) {
+  if (!raw || typeof raw !== 'string') return raw;
+  const s = raw.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s.toLowerCase();
+  if (/^[0-9a-fA-F]{3}$/.test(s)) return '#' + s.toLowerCase().split('').map((c) => c + c).join('');
+  return raw;
+}
 
 const REFINE_DIMENSIONS = [
   { value: '1:1', label: '1:1 Feed' },
@@ -57,6 +75,9 @@ export default function RefineImageForm({
   const [refineInstruction, setRefineInstruction] = useState('');
   const [refineDimensions, setRefineDimensions] = useState('1:1');
   const [refineImageSize, setRefineImageSize] = useState('1K');
+  const [refineAmbientColor, setRefineAmbientColor] = useState('');
+  const [refineRimLightColor, setRefineRimLightColor] = useState('');
+  const [refineFillLightColor, setRefineFillLightColor] = useState('');
   const [referenceArtFile, setReferenceArtFile] = useState(null);
   const [referenceArtPreviewUrl, setReferenceArtPreviewUrl] = useState('');
   const [replacementFile, setReplacementFile] = useState(null);
@@ -269,9 +290,16 @@ export default function RefineImageForm({
         }
       }
 
+      const configOverrides = {
+          dimensions: refineDimensions,
+          image_size: refineImageSize,
+          ...(refineAmbientColor.trim() && { ambient_color: refineAmbientColor.trim() }),
+          ...(refineRimLightColor.trim() && { rim_light_color: refineRimLightColor.trim() }),
+          ...(refineFillLightColor.trim() && { fill_light_color: refineFillLightColor.trim() }),
+        };
       const payload = {
         instruction,
-        configOverrides: { dimensions: refineDimensions, image_size: refineImageSize },
+        configOverrides,
         ...(referenceImageUrl && { referenceImageUrl }),
         ...(replacementImageUrl && { replacementImageUrl }),
         ...(addImageUrl && { addImageUrl }),
@@ -638,13 +666,13 @@ export default function RefineImageForm({
         )}
 
         {/* Opções avançadas */}
-        <div className="pt-3 border-t border-border space-y-2">
+        <div className="pt-3 border-t border-border space-y-2 min-w-0">
           <p className="text-xs text-muted-foreground font-medium">Opções avançadas (opcional)</p>
-          <div className="flex flex-wrap gap-4">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+            <div className="min-w-0">
               <label className="text-xs text-muted-foreground block mb-1">Dimensões</label>
               <Select value={refineDimensions} onValueChange={setRefineDimensions}>
-                <SelectTrigger className="w-[140px] h-8 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-full min-w-0 h-8 bg-muted border-border text-foreground text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
@@ -654,10 +682,10 @@ export default function RefineImageForm({
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs text-muted-foreground block mb-1">Qualidade</label>
               <Select value={refineImageSize} onValueChange={setRefineImageSize}>
-                <SelectTrigger className="w-[100px] h-8 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-full min-w-0 h-8 bg-muted border-border text-foreground text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
@@ -666,6 +694,68 @@ export default function RefineImageForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="space-y-3 pt-2 min-w-0">
+            <Label className="text-xs">Cores e iluminação</Label>
+            <div className="space-y-2 min-w-0">
+              <div className="min-w-0">
+                <label className="text-xs text-muted-foreground block mb-1">Ambiente</label>
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="color"
+                    value={hexToColorInput(refineAmbientColor)}
+                    onChange={(e) => setRefineAmbientColor(e.target.value)}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                    title="Escolher cor"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="#hex"
+                    value={refineAmbientColor || ''}
+                    onChange={(e) => setRefineAmbientColor(normalizeHexInput(e.target.value) || e.target.value)}
+                    className="h-8 flex-1 min-w-0 bg-muted border-border text-foreground text-xs"
+                  />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <label className="text-xs text-muted-foreground block mb-1">Recorte</label>
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="color"
+                    value={hexToColorInput(refineRimLightColor)}
+                    onChange={(e) => setRefineRimLightColor(e.target.value)}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                    title="Escolher cor"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="#hex"
+                    value={refineRimLightColor || ''}
+                    onChange={(e) => setRefineRimLightColor(normalizeHexInput(e.target.value) || e.target.value)}
+                    className="h-8 flex-1 min-w-0 bg-muted border-border text-foreground text-xs"
+                  />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <label className="text-xs text-muted-foreground block mb-1">Preenchimento</label>
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="color"
+                    value={hexToColorInput(refineFillLightColor)}
+                    onChange={(e) => setRefineFillLightColor(e.target.value)}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-muted"
+                    title="Escolher cor"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="#hex"
+                    value={refineFillLightColor || ''}
+                    onChange={(e) => setRefineFillLightColor(normalizeHexInput(e.target.value) || e.target.value)}
+                    className="h-8 flex-1 min-w-0 bg-muted border-border text-foreground text-xs"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
