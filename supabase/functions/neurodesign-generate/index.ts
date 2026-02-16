@@ -8,6 +8,28 @@ const corsHeaders = {
 
 function buildPrompt(config: Record<string, unknown>): string {
   const parts: string[] = [];
+  const textBlockParts: string[] = [];
+
+  if (config.text_enabled) {
+    const h1 = (config.headline_h1 as string)?.trim() || "";
+    const h2 = (config.subheadline_h2 as string)?.trim() || "";
+    const cta = (config.cta_button_text as string)?.trim() || "";
+    const textPos = (config.text_position as string)?.trim() || "centro";
+    if (h1 || h2 || cta) {
+      const textLines: string[] = [];
+      if (h1) textLines.push(`Título em destaque: "${h1}"`);
+      if (h2) textLines.push(`Subtítulo: "${h2}"`);
+      if (cta) textLines.push(`Botão: "${cta}"`);
+      textBlockParts.push(
+        "OBRIGATÓRIO - TEXTO VISÍVEL NA IMAGEM: A arte deve exibir este texto de forma clara e legível, sem alterar uma letra: " +
+          textLines.join(". ") + ". Posição do texto: " + textPos + "."
+      );
+      if (config.text_gradient) textBlockParts.push("O texto deve ter efeito de gradiente (degradê nas letras).");
+    } else {
+      textBlockParts.push("Espaço reservado para texto na composição. Posição: " + textPos + ".");
+    }
+  }
+
   const gender = config.subject_gender === "masculino" ? "homem" : config.subject_gender === "feminino" ? "mulher" : "";
   const subjectDesc = (config.subject_description as string)?.trim() || "";
   if (gender || subjectDesc) parts.push(`Sujeito principal: ${[gender, subjectDesc].filter(Boolean).join(", ")}.`);
@@ -27,13 +49,11 @@ function buildPrompt(config: Record<string, unknown>): string {
     const h2 = (config.subheadline_h2 as string)?.trim() || "";
     const cta = (config.cta_button_text as string)?.trim() || "";
     if (h1 || h2 || cta) {
-      parts.push("Obrigatório: o texto exibido na imagem deve ser exatamente o seguinte, sem alterar ou inventar.");
-      if (h1) parts.push(`Título principal (H1): ${h1}.`);
-      if (h2) parts.push(`Subtítulo (H2): ${h2}.`);
-      if (cta) parts.push(`Texto do botão CTA: ${cta}.`);
+      parts.push("O texto exibido na imagem deve ser exatamente: " + [h1, h2, cta].filter(Boolean).map((t) => `"${t}"`).join(", ") + ".");
+      const textPos = (config.text_position as string)?.trim();
+      if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
+      if (config.text_gradient) parts.push("O texto na imagem deve ter efeito de gradiente (degradê nas letras), visível e aplicado ao título e subtítulo.");
     }
-    const textPos = (config.text_position as string)?.trim();
-    if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
   }
   const attrs = (config.visual_attributes as Record<string, unknown>) || {};
   const tags = Array.isArray(attrs.style_tags) ? attrs.style_tags : [];
@@ -62,7 +82,9 @@ function buildPrompt(config: Record<string, unknown>): string {
   const dims = (config.dimensions as string) || "1:1";
   parts.push(`Formato: ${dims}. Safe area para texto.`);
   if ((config.additional_prompt as string)?.trim()) parts.push((config.additional_prompt as string).trim());
-  return parts.filter(Boolean).join(" ");
+  const mainPrompt = parts.filter(Boolean).join(" ");
+  const textBlock = textBlockParts.filter(Boolean).join(" ");
+  return textBlock ? textBlock + " " + mainPrompt : mainPrompt;
 }
 
 const SUBJECT_FACE_INSTRUCTION =

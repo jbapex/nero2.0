@@ -10,6 +10,28 @@ export function buildPrompt(config) {
   if (!config) return '';
 
   const parts = [];
+  const textBlockParts = [];
+
+  // TEXTO NA IMAGEM: bloco prioritário no início (modelos de imagem precisam ver isso primeiro)
+  if (config.text_enabled) {
+    const h1 = (config.headline_h1 || '').trim();
+    const h2 = (config.subheadline_h2 || '').trim();
+    const cta = (config.cta_button_text || '').trim();
+    const textPos = (config.text_position || '').trim() || 'centro';
+    if (h1 || h2 || cta) {
+      const textLines = [];
+      if (h1) textLines.push(`Título em destaque: "${h1}"`);
+      if (h2) textLines.push(`Subtítulo: "${h2}"`);
+      if (cta) textLines.push(`Botão: "${cta}"`);
+      textBlockParts.push(
+        'OBRIGATÓRIO - TEXTO VISÍVEL NA IMAGEM: A arte deve exibir este texto de forma clara e legível, sem alterar uma letra: ' +
+        textLines.join('. ') + '. Posição do texto: ' + textPos + '.'
+      );
+      if (config.text_gradient) textBlockParts.push('O texto deve ter efeito de gradiente (degradê nas letras).');
+    } else {
+      textBlockParts.push('Espaço reservado para texto na composição. Posição: ' + textPos + '.');
+    }
+  }
 
   // Subject block
   const gender = config.subject_gender === 'masculino' ? 'homem' : config.subject_gender === 'feminino' ? 'mulher' : '';
@@ -45,13 +67,11 @@ export function buildPrompt(config) {
     const h2 = (config.subheadline_h2 || '').trim();
     const cta = (config.cta_button_text || '').trim();
     if (h1 || h2 || cta) {
-      parts.push('Obrigatório: o texto exibido na imagem deve ser exatamente o seguinte, sem alterar ou inventar.');
-      if (h1) parts.push(`Título principal (H1): ${h1}.`);
-      if (h2) parts.push(`Subtítulo (H2): ${h2}.`);
-      if (cta) parts.push(`Texto do botão CTA: ${cta}.`);
+      parts.push('O texto exibido na imagem deve ser exatamente: ' + [h1, h2, cta].filter(Boolean).map(t => `"${t}"`).join(', ') + '.');
+      const textPos = (config.text_position || '').trim();
+      if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
+      if (config.text_gradient) parts.push('O texto na imagem deve ter efeito de gradiente (degradê nas letras), visível e aplicado ao título e subtítulo.');
     }
-    const textPos = (config.text_position || '').trim();
-    if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
   }
 
   // Style block
@@ -80,5 +100,7 @@ export function buildPrompt(config) {
     parts.push(config.additional_prompt.trim());
   }
 
-  return parts.filter(Boolean).join(' ');
+  const mainPrompt = parts.filter(Boolean).join(' ');
+  const textBlock = textBlockParts.filter(Boolean).join(' ');
+  return textBlock ? textBlock + ' ' + mainPrompt : mainPrompt;
 }
