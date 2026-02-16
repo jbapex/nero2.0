@@ -41,6 +41,17 @@ export function buildPrompt(config) {
   if (layoutPos) parts.push(`Posição do sujeito: ${layoutPos}.`);
   if (config.text_enabled) {
     parts.push('Espaço reservado para texto na composição.');
+    const h1 = (config.headline_h1 || '').trim();
+    const h2 = (config.subheadline_h2 || '').trim();
+    const cta = (config.cta_button_text || '').trim();
+    if (h1 || h2 || cta) {
+      parts.push('Obrigatório: o texto exibido na imagem deve ser exatamente o seguinte, sem alterar ou inventar.');
+      if (h1) parts.push(`Título principal (H1): ${h1}.`);
+      if (h2) parts.push(`Subtítulo (H2): ${h2}.`);
+      if (cta) parts.push(`Texto do botão CTA: ${cta}.`);
+    }
+    const textPos = (config.text_position || '').trim();
+    if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
   }
 
   // Style block

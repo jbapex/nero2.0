@@ -153,6 +153,10 @@ const NeuroDesignPage = () => {
       toast({ title: 'Projeto ainda não carregou', variant: 'destructive' });
       return;
     }
+    if (config?.text_enabled && !((config.headline_h1 || '').trim() || (config.subheadline_h2 || '').trim() || (config.cta_button_text || '').trim())) {
+      toast({ title: "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA.", variant: 'destructive' });
+      return;
+    }
     generatingRef.current = true;
     setIsGenerating(true);
     try {

@@ -544,14 +544,30 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
       </div>
 
       <div className="flex gap-2">
+        {(() => {
+          const hasConnection = localConfig.user_ai_connection_id && localConfig.user_ai_connection_id !== 'none';
+          const hasTextFilled = !localConfig.text_enabled || Boolean(
+            (localConfig.headline_h1 || '').trim() ||
+            (localConfig.subheadline_h2 || '').trim() ||
+            (localConfig.cta_button_text || '').trim()
+          );
+          const disabled = isGenerating || !hasConnection || !hasTextFilled;
+          const title = !hasConnection
+            ? 'Selecione uma conexão de imagem para gerar'
+            : !hasTextFilled
+              ? "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA"
+              : undefined;
+          return (
         <Button
           className="flex-1 bg-primary hover:bg-primary/90"
           onClick={() => onGenerate?.(localConfig)}
-          disabled={isGenerating || !localConfig.user_ai_connection_id || localConfig.user_ai_connection_id === 'none'}
-          title={(!localConfig.user_ai_connection_id || localConfig.user_ai_connection_id === 'none') ? 'Selecione uma conexão de imagem para gerar' : undefined}
+          disabled={disabled}
+          title={title}
         >
           {isGenerating ? <span className="animate-pulse">Gerando...</span> : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Imagem</>}
         </Button>
+          );
+        })()}
         <Button variant="outline" size="icon" onClick={() => setConfig?.({ ...localConfig, id: undefined })} title="Duplicar configuração">
           <Copy className="h-4 w-4" />
         </Button>

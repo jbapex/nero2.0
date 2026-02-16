@@ -21,7 +21,20 @@ function buildPrompt(config: Record<string, unknown>): string {
   const layoutPos = config.layout_position as string;
   if (shot) parts.push(`Enquadramento: ${shot}.`);
   if (layoutPos) parts.push(`Posição do sujeito: ${layoutPos}.`);
-  if (config.text_enabled) parts.push("Espaço reservado para texto.");
+  if (config.text_enabled) {
+    parts.push("Espaço reservado para texto na composição.");
+    const h1 = (config.headline_h1 as string)?.trim() || "";
+    const h2 = (config.subheadline_h2 as string)?.trim() || "";
+    const cta = (config.cta_button_text as string)?.trim() || "";
+    if (h1 || h2 || cta) {
+      parts.push("Obrigatório: o texto exibido na imagem deve ser exatamente o seguinte, sem alterar ou inventar.");
+      if (h1) parts.push(`Título principal (H1): ${h1}.`);
+      if (h2) parts.push(`Subtítulo (H2): ${h2}.`);
+      if (cta) parts.push(`Texto do botão CTA: ${cta}.`);
+    }
+    const textPos = (config.text_position as string)?.trim();
+    if (textPos) parts.push(`Posição do texto na imagem: ${textPos}.`);
+  }
   const attrs = (config.visual_attributes as Record<string, unknown>) || {};
   const tags = Array.isArray(attrs.style_tags) ? attrs.style_tags : [];
   if (tags.length) parts.push(`Estilo: ${tags.join(", ")}.`);
