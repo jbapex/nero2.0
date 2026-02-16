@@ -227,6 +227,15 @@ serve(async (req) => {
       const base = styleInstruction ?? STYLE_REFERENCE_INSTRUCTION;
       styleInstruction = base + " Use a referência apenas para estilo visual. Os textos, slogans e logos a exibir são os descritos no prompt abaixo; não copie o texto ou a marca das imagens de referência.";
     }
+    const hasRef = styleReferenceUrls.length > 0;
+    const hasSubject = subjectImageUrls.length > 0;
+    const hasColors = [config.ambient_color, config.rim_light_color, config.fill_light_color].some((c) => typeof c === "string" && c.trim());
+    let promptToUse = prompt;
+    if (style_reference_only === true && (hasRef || hasSubject || hasColors)) {
+      const priority = "Prioridade: use obrigatoriamente a referência de estilo, o sujeito principal (se fornecido) e as cores indicadas na geração. A imagem deve refletir essas configurações. ";
+      if (styleInstruction) styleInstruction = priority + styleInstruction;
+      else promptToUse = priority + prompt;
+    }
     const logoUrl = (config.logo_url && typeof config.logo_url === "string" && config.logo_url.trim()) ? config.logo_url.trim() : undefined;
 
     const runInsert = {
@@ -247,7 +256,7 @@ serve(async (req) => {
     try {
       images = await generateWithGoogleGemini(
         conn as Conn,
-        prompt,
+        promptToUse,
         quantity,
         (config.dimensions as string) || "1:1",
         imageSize,

@@ -41,6 +41,7 @@ import React from 'react';
             addImageOutputNode,
             addAgentOutputNode,
             addCarouselSlideImageNode,
+            getFreshInputData,
             handleSaveFlow,
             handleNewFlow,
             handleFlowSelect,
@@ -86,6 +87,7 @@ import React from 'react';
                                     onAddImageOutputNode={addImageOutputNode}
                                     onAddAgentOutputNode={addAgentOutputNode}
                                     onAddCarouselSlideImageNode={addCarouselSlideImageNode}
+                                    getFreshInputData={getFreshInputData}
                                     onRefreshData={flowData.fetchData}
                                 />
                             </ResizablePanel>

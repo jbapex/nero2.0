@@ -34,6 +34,7 @@ const FlowCanvas = ({
     onAddImageOutputNode,
     onAddAgentOutputNode,
     onAddCarouselSlideImageNode,
+    getFreshInputData,
     onRefreshData,
 }) => {
     const nodeTypes = useMemo(() => ({
@@ -44,10 +45,10 @@ const FlowCanvas = ({
         chat: (props) => <ChatNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onRefreshData }} />,
         planning: (props) => <PlanningNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         analysis: (props) => <AnalysisNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
-        image_generator: (props) => <ImageGeneratorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddImageOutputNode }} />,
+        image_generator: (props) => <ImageGeneratorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddImageOutputNode, getFreshInputData }} />,
         generated_image: GeneratedImageNode,
         generated_content: GeneratedContentNode,
-        carousel: (props) => <CarouselNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddCarouselSlideImageNode }} />,
+        carousel: (props) => <CarouselNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData, onAddCarouselSlideImageNode, getFreshInputData }} />,
         video_transcriber: (props) => <VideoTranscriberNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         page_analyzer: (props) => <PageAnalyzerNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         site_creator: (props) => <SiteCreatorNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
@@ -57,7 +58,7 @@ const FlowCanvas = ({
         colors: (props) => <ColorsNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         styles: (props) => <StylesNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
         subject: (props) => <SubjectNode {...props} data={{ ...props.data, onUpdateNodeData: updateNodeData }} />,
-    }), [updateNodeData, onAddImageOutputNode, onAddAgentOutputNode, onAddCarouselSlideImageNode, onRefreshData]);
+    }), [updateNodeData, onAddImageOutputNode, onAddAgentOutputNode, onAddCarouselSlideImageNode, getFreshInputData, onRefreshData]);
 
     const edgeTypes = useMemo(() => ({
         custom: CustomEdge,

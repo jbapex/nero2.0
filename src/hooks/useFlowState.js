@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNodesState, useEdgesState, addEdge, useReactFlow } from 'reactflow';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -35,6 +35,11 @@ export const useFlowState = (flowData) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { toast } = useToast();
+
+    const nodesRef = useRef(nodes);
+    const edgesRef = useRef(edges);
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
 
     const fetchFlows = useCallback(async () => {
         if (!user) return;
@@ -117,6 +122,10 @@ export const useFlowState = (flowData) => {
         }
         return context;
     };
+
+    const getFreshInputData = useCallback((nodeId) => {
+        return getUpstreamNodesData(nodeId, nodesRef.current, edgesRef.current);
+    }, []);
 
     const onConnect = useCallback((params) => {
         setEdges((eds) => addEdge({ ...params, animated: true }, eds));
@@ -372,6 +381,7 @@ export const useFlowState = (flowData) => {
         addImageOutputNode,
         addAgentOutputNode,
         addCarouselSlideImageNode,
+        getFreshInputData,
         handleSaveFlow,
         handleNewFlow,
         handleFlowSelect,

@@ -161,6 +161,30 @@ function buildUpstreamSummary(inputData) {
   if (contentText) {
     lines.push({ label: 'Conteúdo (agente/resultado)', text: contentText.slice(0, 500) + (contentText.length > 500 ? '…' : '') });
   }
+  // Ferramentas avançadas (referência de estilo, cores, logo, estilos, sujeito)
+  const refCount = Object.keys(inputData).filter((k) => k === 'reference_image' || /^reference_image_\d+$/.test(k)).filter((k) => inputData[k]?.data).length;
+  if (refCount > 0) {
+    lines.push({ label: 'Imagem de referência', text: refCount === 1 ? 'Referência de estilo conectada' : `${refCount} referências de estilo` });
+  }
+  const colorsData = inputData.colors?.data;
+  if (colorsData && (colorsData.ambient_color || colorsData.rim_light_color || colorsData.fill_light_color)) {
+    const parts = [colorsData.ambient_color, colorsData.rim_light_color, colorsData.fill_light_color].filter(Boolean).map((c) => (c && c.trim() ? c.trim() : null)).filter(Boolean);
+    lines.push({ label: 'Cores', text: parts.length ? `Luz ambiente, recorte, preenchimento (${parts.join(', ')})` : 'Luz ambiente, recorte, preenchimento' });
+  }
+  if (inputData.image_logo?.data?.logo_url || inputData.image_logo_2?.data?.logo_url) {
+    lines.push({ label: 'Logo', text: 'Logo conectada' });
+  }
+  if (inputData.styles?.data) {
+    lines.push({ label: 'Estilos', text: 'Estilos visuais conectados' });
+  }
+  const subjectData = inputData.subject?.data;
+  if (subjectData && (subjectData.subject_gender || subjectData.subject_description || (Array.isArray(subjectData.subject_image_urls) && subjectData.subject_image_urls.length))) {
+    const parts = [];
+    if (subjectData.subject_gender === 'masculino' || subjectData.subject_gender === 'feminino') parts.push(subjectData.subject_gender === 'masculino' ? 'Homem' : 'Mulher');
+    if (subjectData.subject_description?.trim()) parts.push(subjectData.subject_description.trim().slice(0, 80) + (subjectData.subject_description.length > 80 ? '…' : ''));
+    if (Array.isArray(subjectData.subject_image_urls) && subjectData.subject_image_urls.length) parts.push(`${subjectData.subject_image_urls.length} foto(s) de rosto`);
+    lines.push({ label: 'Sujeito principal', text: parts.length ? parts.join(' · ') : 'Sujeito conectado' });
+  }
   return { lines, contentText };
 }
 
@@ -239,7 +263,7 @@ function extractJsonFromResponse(str) {
 }
 
 const CarouselNode = memo(({ data, id }) => {
-  const { onUpdateNodeData, inputData, onAddCarouselSlideImageNode } = data;
+  const { onUpdateNodeData, inputData, onAddCarouselSlideImageNode, getFreshInputData } = data;
   const { toast } = useToast();
   const { user } = useAuth();
   const numSlides = Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, data.numSlides ?? 5));
@@ -634,6 +658,7 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
       if (!proj) return;
       setGeneratingSlideIndex(slideIndex);
       try {
+        const freshInputData = typeof getFreshInputData === 'function' ? getFreshInputData(id) : (inputData || {});
         const conn = imageConnections.find((c) => c.id === selectedImageConnectionId);
         const isGoogle = conn?.provider?.toLowerCase() === 'google';
         const fnName = isGoogle ? 'neurodesign-generate-google' : 'neurodesign-generate';
@@ -644,7 +669,7 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
           user_ai_connection_id: selectedImageConnectionId,
           additional_prompt: fullPrompt,
         };
-        const flowOverrides = mergeFlowInputDataIntoConfig(inputData || {});
+        const flowOverrides = mergeFlowInputDataIntoConfig(freshInputData);
         const disabled = slides[slideIndex]?.disabledSupportTypes ?? [];
         const flowFiltered = filterOverridesByDisabledSupportTypes(flowOverrides, disabled);
         const config = { ...baseConfig, ...flowFiltered };
@@ -697,6 +722,7 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
       getOrCreateProject,
       imageConnections,
       inputData,
+      getFreshInputData,
       id,
       onUpdateNodeData,
       onAddCarouselSlideImageNode,
@@ -732,6 +758,9 @@ Exemplo: {"numSlides": 3, "slides": [{"orientation": "Capa: título e subtítulo
               </Button>
               {!dataCollapsed && (
                 <>
+                  {getConnectedSupportTypes(inputData).length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Configurações do Neuro Designer (prioridade na geração)</p>
+                  )}
                   <ScrollArea className="max-h-32 rounded-md border bg-muted/30 p-2 text-xs mt-1">
                     {upstreamSummary.lines.map((line, i) => (
                       <div key={i} className="mb-1">

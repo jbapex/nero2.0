@@ -110,7 +110,7 @@ function buildContextSections(inputData) {
 }
 
 const ImageGeneratorNode = memo(({ data, id }) => {
-  const { onUpdateNodeData, presets, inputData, expanded, onAddImageOutputNode } = data;
+  const { onUpdateNodeData, presets, inputData, expanded, onAddImageOutputNode, getFreshInputData } = data;
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -201,6 +201,7 @@ const ImageGeneratorNode = memo(({ data, id }) => {
     setIsLoading(true);
     setLastImageUrl(null);
     try {
+      const freshInputData = typeof getFreshInputData === 'function' ? getFreshInputData(id) : (inputData || {});
       const conn = imageConnections.find((c) => c.id === selectedConnectionId);
       const isGoogle = conn?.provider?.toLowerCase() === 'google';
       const fnName = isGoogle ? 'neurodesign-generate-google' : 'neurodesign-generate';
@@ -211,7 +212,7 @@ const ImageGeneratorNode = memo(({ data, id }) => {
         user_ai_connection_id: selectedConnectionId,
         additional_prompt: fullPromptForApi,
       };
-      const flowOverrides = mergeFlowInputDataIntoConfig(inputData);
+      const flowOverrides = mergeFlowInputDataIntoConfig(freshInputData);
       const config = { ...baseConfig, ...flowOverrides };
       const { data: result, error } = await supabase.functions.invoke(fnName, {
         body: {
