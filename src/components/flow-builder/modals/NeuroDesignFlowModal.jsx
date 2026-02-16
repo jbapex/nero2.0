@@ -13,6 +13,7 @@ import { X } from 'lucide-react';
 import BuilderPanel from '@/components/neurodesign/BuilderPanel';
 import PreviewPanel from '@/components/neurodesign/PreviewPanel';
 import { mergeFlowInputDataIntoConfig } from '@/lib/neurodesign/flowConfigMerge';
+import { neuroDesignDefaultConfig } from '@/lib/neurodesign/defaultConfig';
 
 function buildFlowContextText(inputData) {
   if (!inputData || typeof inputData !== 'object') return '';
@@ -45,7 +46,7 @@ function buildFlowContextText(inputData) {
 }
 
 const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
-  'subject_gender', 'subject_description', 'niche_project', 'environment',
+  'subject_gender', 'subject_description', 'subject_enabled', 'niche_project', 'environment',
   'shot_type', 'layout_position', 'dimensions', 'image_size', 'text_enabled', 'headline_h1',
   'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
   'visual_attributes', 'ambient_color', 'rim_light_color', 'fill_light_color',
@@ -157,7 +158,7 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
     try {
       const { data, error } = await supabase
         .from('user_ai_connections')
-        .select('id, name, provider, default_model, capabilities')
+        .select('id, name, provider, default_model, capabilities, is_active')
         .eq('user_id', user.id);
       if (error) return;
       setImageConnections((data || []).filter((c) => c.capabilities?.image_generation));
@@ -230,6 +231,15 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       setCurrentConfig(null);
     }
   }, [isVisible, project, initialConfig, fetchRuns, fetchImages]);
+
+  // Conexão de imagem: usar o modelo ativo de Minha IA (conexões de geração de imagem)
+  useEffect(() => {
+    if (!isVisible || currentConfig !== null || imageConnections.length === 0) return;
+    const activeId = imageConnections.find((c) => c.is_active === true)?.id ?? imageConnections[0]?.id;
+    if (activeId) {
+      setCurrentConfig({ ...neuroDesignDefaultConfig(), user_ai_connection_id: activeId });
+    }
+  }, [isVisible, imageConnections, currentConfig]);
 
   const handleGenerate = useCallback(async (config) => {
     if (generatingRef.current) return;

@@ -15,6 +15,7 @@ import BuilderPanel from '@/components/neurodesign/BuilderPanel';
 import PreviewPanel from '@/components/neurodesign/PreviewPanel';
 import MasonryGallery from '@/components/neurodesign/MasonryGallery';
 import NeuroDesignErrorBoundary from '@/components/neurodesign/NeuroDesignErrorBoundary';
+import { neuroDesignDefaultConfig } from '@/lib/neurodesign/defaultConfig';
 
 const NeuroDesignPage = () => {
   const { user } = useAuth();
@@ -75,7 +76,7 @@ const NeuroDesignPage = () => {
     try {
       const { data, error } = await supabase
         .from('user_ai_connections')
-        .select('id, name, provider, default_model, capabilities')
+        .select('id, name, provider, default_model, capabilities, is_active')
         .eq('user_id', user.id);
       if (error) return;
       setImageConnections((data || []).filter((c) => c.capabilities?.image_generation));
@@ -146,6 +147,15 @@ const NeuroDesignPage = () => {
       setSelectedImage(null);
     }
   }, [project, fetchRuns, fetchImages]);
+
+  // Conexão de imagem: usar sempre o modelo ativo de Minha IA (conexões de geração de imagem)
+  useEffect(() => {
+    if (currentConfig !== null || imageConnections.length === 0) return;
+    const activeId = imageConnections.find((c) => c.is_active === true)?.id ?? imageConnections[0]?.id;
+    if (activeId) {
+      setCurrentConfig({ ...neuroDesignDefaultConfig(), user_ai_connection_id: activeId });
+    }
+  }, [imageConnections, currentConfig]);
 
   const handleGenerate = async (config) => {
     if (generatingRef.current) return;
@@ -291,7 +301,7 @@ const NeuroDesignPage = () => {
   };
 
   const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
-    'subject_gender', 'subject_description', 'niche_project', 'environment',
+    'subject_gender', 'subject_description', 'subject_enabled', 'niche_project', 'environment',
     'shot_type', 'layout_position', 'dimensions', 'image_size', 'text_enabled', 'headline_h1',
     'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
     'visual_attributes', 'ambient_color', 'rim_light_color', 'fill_light_color',

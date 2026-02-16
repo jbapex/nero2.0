@@ -10,6 +10,7 @@ export function neuroDesignDefaultConfig() {
     subject_gender: 'feminino',
     subject_description: '',
     subject_image_urls: [],
+    subject_enabled: true,
     quantity: 1,
     layout_position: 'centro',
     dimensions: '1:1',

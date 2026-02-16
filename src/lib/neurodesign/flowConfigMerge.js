@@ -67,9 +67,10 @@ export function mergeFlowInputDataIntoConfig(inputData) {
     };
   }
 
-  // subject → subject_gender, subject_description, subject_image_urls
+  // subject → subject_gender, subject_description, subject_image_urls, subject_enabled
   const subjectEntry = inputData.subject?.data;
   if (subjectEntry) {
+    if (subjectEntry.subject_enabled === false || subjectEntry.subject_enabled === true) overrides.subject_enabled = subjectEntry.subject_enabled;
     if (subjectEntry.subject_gender === 'masculino' || subjectEntry.subject_gender === 'feminino') overrides.subject_gender = subjectEntry.subject_gender;
     if (typeof subjectEntry.subject_description === 'string' && subjectEntry.subject_description.trim()) overrides.subject_description = subjectEntry.subject_description.trim();
     const urls = subjectEntry.subject_image_urls;
@@ -87,7 +88,7 @@ const SUPPORT_TYPE_KEYS = {
   image_logo: ['logo_url'],
   colors: ['ambient_color', 'rim_light_color', 'fill_light_color'],
   styles: ['visual_attributes'],
-  subject: ['subject_gender', 'subject_description', 'subject_image_urls'],
+  subject: ['subject_gender', 'subject_description', 'subject_image_urls', 'subject_enabled'],
 };
 
 /**

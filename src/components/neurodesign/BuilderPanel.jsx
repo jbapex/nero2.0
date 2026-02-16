@@ -221,35 +221,43 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
 
       <div>
         <Label>Sujeito principal</Label>
-        <div className="mt-1 flex gap-2 flex-wrap">
-          {(localConfig.subject_image_urls || []).map((url, i) => (
-            <div key={i} className="relative w-16 h-16 rounded overflow-hidden bg-muted">
-              <img src={url} alt="" className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage('subject_image_urls', i); }}
-                className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
-                aria-label="Remover imagem do sujeito"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-          <label className="w-16 h-16 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted">
-            <Upload className="h-5 w-5 text-muted-foreground" />
-            <input type="file" accept="image/*" className="hidden" multiple onChange={(e) => handleUpload('subject', e.target.files)} />
-          </label>
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <span className="text-sm text-muted-foreground">Sujeito na arte</span>
+          <Switch checked={localConfig.subject_enabled !== false} onCheckedChange={(v) => update('subject_enabled', v)} />
         </div>
-        <Select value={localConfig.subject_gender || 'feminino'} onValueChange={(v) => update('subject_gender', v)}>
-          <SelectTrigger className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-popover text-popover-foreground">
-            <SelectItem value="feminino">Feminino</SelectItem>
-            <SelectItem value="masculino">Masculino</SelectItem>
-          </SelectContent>
-        </Select>
-        <Textarea placeholder="Descrição pose/roupa" value={localConfig.subject_description || ''} onChange={(e) => update('subject_description', e.target.value)} className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px]" />
+        {(localConfig.subject_enabled !== false) && (
+          <>
+            <div className="mt-1 flex gap-2 flex-wrap">
+              {(localConfig.subject_image_urls || []).map((url, i) => (
+                <div key={i} className="relative w-16 h-16 rounded overflow-hidden bg-muted">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage('subject_image_urls', i); }}
+                    className="absolute top-0 right-0 z-10 flex items-center justify-center min-w-[36px] min-h-[36px] bg-foreground/80 hover:bg-foreground text-background rounded-bl cursor-pointer touch-manipulation"
+                    aria-label="Remover imagem do sujeito"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <label className="w-16 h-16 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted">
+                <Upload className="h-5 w-5 text-muted-foreground" />
+                <input type="file" accept="image/*" className="hidden" multiple onChange={(e) => handleUpload('subject', e.target.files)} />
+              </label>
+            </div>
+            <Select value={localConfig.subject_gender || 'feminino'} onValueChange={(v) => update('subject_gender', v)}>
+              <SelectTrigger className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover text-popover-foreground">
+                <SelectItem value="feminino">Feminino</SelectItem>
+                <SelectItem value="masculino">Masculino</SelectItem>
+              </SelectContent>
+            </Select>
+            <Textarea placeholder="Descrição pose/roupa" value={localConfig.subject_description || ''} onChange={(e) => update('subject_description', e.target.value)} className="mt-2 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px]" />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2">

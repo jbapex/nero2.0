@@ -30,9 +30,13 @@ function buildPrompt(config: Record<string, unknown>): string {
     }
   }
 
-  const gender = config.subject_gender === "masculino" ? "homem" : config.subject_gender === "feminino" ? "mulher" : "";
-  const subjectDesc = (config.subject_description as string)?.trim() || "";
-  if (gender || subjectDesc) parts.push(`Sujeito principal: ${[gender, subjectDesc].filter(Boolean).join(", ")}.`);
+  if (config.subject_enabled === false) {
+    parts.push("A imagem não deve conter figura humana. Arte apenas de cenário, objetos ou ambiente, sem pessoas.");
+  } else {
+    const gender = config.subject_gender === "masculino" ? "homem" : config.subject_gender === "feminino" ? "mulher" : "";
+    const subjectDesc = (config.subject_description as string)?.trim() || "";
+    if (gender || subjectDesc) parts.push(`Sujeito principal: ${[gender, subjectDesc].filter(Boolean).join(", ")}.`);
+  }
   const niche = (config.niche_project as string)?.trim();
   if (niche) parts.push(`Contexto/nicho: ${niche}. Objetivo: criativo de marca/ads.`);
   const env = (config.environment as string)?.trim();
@@ -257,8 +261,10 @@ serve(async (req) => {
 
     const quantity = Math.min(Math.max(Number(config.quantity) || 1, 1), 5);
     const prompt = buildPrompt(config);
-    const subjectImageUrls: string[] = Array.isArray(config.subject_image_urls)
-      ? (config.subject_image_urls as string[]).filter((u): u is string => typeof u === "string" && u.length > 0).slice(0, 2)
+    const subjectImageUrls: string[] = config.subject_enabled === false
+      ? []
+      : Array.isArray(config.subject_image_urls)
+        ? (config.subject_image_urls as string[]).filter((u): u is string => typeof u === "string" && u.length > 0).slice(0, 2)
       : [];
     const styleReferenceUrls: string[] = Array.isArray(config.style_reference_urls)
       ? (config.style_reference_urls as string[]).filter((u): u is string => typeof u === "string" && u.length > 0).slice(0, 3)

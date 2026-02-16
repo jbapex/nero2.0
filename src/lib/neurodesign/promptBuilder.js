@@ -34,10 +34,14 @@ export function buildPrompt(config) {
   }
 
   // Subject block
-  const gender = config.subject_gender === 'masculino' ? 'homem' : config.subject_gender === 'feminino' ? 'mulher' : '';
-  const subjectDesc = config.subject_description?.trim() || '';
-  if (gender || subjectDesc) {
-    parts.push(`Sujeito principal: ${[gender, subjectDesc].filter(Boolean).join(', ')}.`);
+  if (config.subject_enabled === false) {
+    parts.push('A imagem não deve conter figura humana. Arte apenas de cenário, objetos ou ambiente, sem pessoas.');
+  } else {
+    const gender = config.subject_gender === 'masculino' ? 'homem' : config.subject_gender === 'feminino' ? 'mulher' : '';
+    const subjectDesc = config.subject_description?.trim() || '';
+    if (gender || subjectDesc) {
+      parts.push(`Sujeito principal: ${[gender, subjectDesc].filter(Boolean).join(', ')}.`);
+    }
   }
 
   // Context block
