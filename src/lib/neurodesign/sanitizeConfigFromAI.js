@@ -10,7 +10,7 @@ const SHAPE_STYLE_VALUES = ['rounded_rectangle', 'banner', 'pill'];
 export const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
   'subject_enabled', 'subject_gender', 'subject_description', 'quantity', 'niche_project', 'environment',
   'shot_type', 'layout_position', 'dimensions', 'image_size', 'use_scenario_photos',
-  'text_enabled', 'headline_h1', 'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
+  'text_enabled', 'text_mode', 'custom_text', 'custom_text_font_description', 'use_reference_image_text', 'headline_h1', 'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
   'headline_zone', 'subheadline_zone', 'cta_zone',
   'headline_font', 'subheadline_font', 'cta_font',
   'headline_color', 'subheadline_color', 'cta_color',
@@ -28,6 +28,7 @@ export const NEURODESIGN_FILL_ENUMS = {
   layout_position: ['esquerda', 'centro', 'direita'],
   dimensions: ['1:1', '4:5', '9:16', '16:9'],
   text_position: ['esquerda', 'centro', 'direita'],
+  text_mode: ['structured', 'free'],
   image_size: ['1K', '2K', '4K'],
   headline_zone: ZONE_VALUES,
   subheadline_zone: ZONE_VALUES,
@@ -45,7 +46,7 @@ export const NEURODESIGN_FILL_ENUMS = {
 export const NEURODESIGN_STYLE_TAGS = ['clássico', 'formal', 'elegante', 'institucional', 'tecnológico', 'minimalista', 'criativo'];
 
 const COLOR_KEYS = new Set(['headline_color', 'subheadline_color', 'cta_color', 'headline_shape_color', 'subheadline_shape_color', 'cta_shape_color', 'text_color', 'text_shape_color', 'ambient_color', 'rim_light_color', 'fill_light_color']);
-const BOOL_KEYS = new Set(['text_enabled', 'text_gradient', 'floating_elements_enabled', 'subject_enabled', 'use_scenario_photos', 'headline_shape_enabled', 'subheadline_shape_enabled', 'cta_shape_enabled', 'text_shape_enabled']);
+const BOOL_KEYS = new Set(['text_enabled', 'text_gradient', 'use_reference_image_text', 'floating_elements_enabled', 'subject_enabled', 'use_scenario_photos', 'headline_shape_enabled', 'subheadline_shape_enabled', 'cta_shape_enabled', 'text_shape_enabled']);
 const HEX_REGEX = /^#[0-9a-fA-F]{3,6}$/;
 
 function isValidHex(s) {

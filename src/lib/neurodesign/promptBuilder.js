@@ -68,6 +68,22 @@ export function buildPrompt(config) {
 
   const textBlockParts = [];
   if (!textOff && config.text_enabled) {
+    const isFreeMode = (config.text_mode || 'structured') === 'free';
+    if (isFreeMode) {
+      const useRefText = config.use_reference_image_text === true || config.use_reference_image_text === 'true';
+      const customText = (config.custom_text || '').trim();
+      const fontDesc = (config.custom_text_font_description || '').trim();
+      if (useRefText) {
+        textBlockParts.push('O texto exibido na imagem deve ser o mesmo que aparece na(s) imagem(ns) de referência anexa(s), reproduzindo-o de forma legível e integrada à cena.');
+      }
+      if (customText) {
+        textBlockParts.push('OBRIGATÓRIO - TEXTO VISÍVEL NA IMAGEM: A arte deve exibir este texto de forma clara e legível, sem alterar uma letra: "' + customText + '".');
+        if (fontDesc) textBlockParts.push('Fonte/estilo do texto: ' + fontDesc + '.');
+      }
+      if (!useRefText && !customText) {
+        textBlockParts.push('Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).');
+      }
+    } else {
     const h1 = (config.headline_h1 || '').trim();
     const h2 = (config.subheadline_h2 || '').trim();
     const cta = (config.cta_button_text || '').trim();
@@ -121,6 +137,7 @@ export function buildPrompt(config) {
     } else {
       textBlockParts.push('Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).');
     }
+    }
   }
 
   const parts = [];
@@ -167,6 +184,19 @@ export function buildPrompt(config) {
   if (layoutPos) parts.push(`Posição do sujeito: ${layoutPos}.`);
 
   if (!textOff && config.text_enabled) {
+    const isFreeMode = (config.text_mode || 'structured') === 'free';
+    if (isFreeMode) {
+      const useRefText = config.use_reference_image_text === true || config.use_reference_image_text === 'true';
+      const customText = (config.custom_text || '').trim();
+      const fontDesc = (config.custom_text_font_description || '').trim();
+      if (useRefText) parts.push('Espaço reservado para texto na composição. O texto exibido deve ser o mesmo das imagens de referência anexas.');
+      if (customText) {
+        parts.push('Espaço reservado para texto na composição.');
+        parts.push('O texto exibido na imagem deve ser exatamente: "' + customText + '".');
+        if (fontDesc) parts.push('Fonte/estilo do texto: ' + fontDesc + '.');
+      }
+      if (!useRefText && !customText) parts.push('Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).');
+    } else {
     const h1 = (config.headline_h1 || '').trim();
     const h2 = (config.subheadline_h2 || '').trim();
     const cta = (config.cta_button_text || '').trim();
@@ -213,6 +243,7 @@ export function buildPrompt(config) {
       }
     } else {
       parts.push('Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).');
+    }
     }
   }
 

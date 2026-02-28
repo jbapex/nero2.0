@@ -111,3 +111,4 @@ $RECYCLE.BIN/
 # Service worker
 sw.js
 sw.js.map
+supabase/.temp/

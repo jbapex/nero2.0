@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { Home, Settings, Users, Layers, Zap, MessageSquare as BotMessageSquare, PenSquare, Palette, ClipboardList, LogOut, Brain, BookCopy, Mic, Menu } from 'lucide-react';
+import { Home, Settings, Users, Layers, Zap, MessageSquare as BotMessageSquare, PenSquare, Palette, ClipboardList, LogOut, Brain, BookCopy, Mic, Menu, Image as ImageIcon } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -25,6 +25,7 @@ const SuperAdminLayout = () => {
     { to: '/superadmin/dashboard', icon: Home, label: 'Dashboard' },
     { to: '/superadmin/planos', icon: Layers, label: 'Planos' },
     { to: '/superadmin/usuarios', icon: Users, label: 'Usuários' },
+    { to: '/superadmin/galeria-imagens', icon: ImageIcon, label: 'Galeria de Imagens' },
     { to: '/superadmin/modulos', icon: Zap, label: 'Módulos de Conteúdo' },
     { to: '/superadmin/ads-inteligente', icon: BotMessageSquare, label: 'Módulos de Anúncios' },
     { to: '/superadmin/planejamento', icon: ClipboardList, label: 'Planejamento Estratégico' },

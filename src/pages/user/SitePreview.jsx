@@ -7,6 +7,12 @@ import { Helmet } from 'react-helmet';
 import { Button } from '@/components/ui/button';
 import { applyModuleColors } from '@/lib/applyModuleColors';
 
+/** Escapa conteúdo para injeção no documento do iframe (evita quebrar </script>, etc.). */
+function escapeHtmlForIframe(html) {
+  if (html == null || typeof html !== 'string') return '';
+  return html.replace(/<\/script>/gi, '<\\/script>');
+}
+
 const SitePreview = () => {
   const { projectId } = useParams();
   const { user } = useAuth();
@@ -18,7 +24,7 @@ const SitePreview = () => {
     setIsLoading(true);
     const { data, error: fetchError } = await supabase
       .from('site_projects')
-      .select('id, name, page_structure, user_id')
+      .select('id, name, page_structure, html_content, user_id')
       .eq('id', projectId)
       .single();
 
@@ -36,13 +42,19 @@ const SitePreview = () => {
     fetchProject();
   }, [fetchProject]);
 
-  const combinedHtml = useMemo(() => {
+  const rootContent = useMemo(() => {
     const structure = project?.page_structure;
-    if (!structure?.length) return '';
-    return structure
-      .map((module) => applyModuleColors(module.html, module.backgroundColor, module.textColor))
-      .join('');
-  }, [project?.page_structure]);
+    if (structure?.length) {
+      return structure
+        .map((module) => applyModuleColors(module.html, module.backgroundColor, module.textColor))
+        .join('');
+    }
+    const raw = project?.html_content;
+    const safe = escapeHtmlForIframe(raw || '');
+    return safe.trim().length > 0
+      ? safe
+      : '<p style="padding:1.5rem;color:#666;font-size:0.875rem;">Nenhum conteúdo ainda.</p>';
+  }, [project?.page_structure, project?.html_content]);
 
   const fullHtml = `
     <!DOCTYPE html>
@@ -51,11 +63,11 @@ const SitePreview = () => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <script src="https://cdn.tailwindcss.com"></script>
-      <style>body { margin: 0; font-family: sans-serif; }</style>
+      <style>body { margin: 0; font-family: sans-serif; background: #fff; }</style>
       <title>${project?.name || 'Preview'}</title>
     </head>
     <body>
-      <div id="root">${combinedHtml || ''}</div>
+      <div id="root">${rootContent}</div>
     </body>
     </html>
   `;

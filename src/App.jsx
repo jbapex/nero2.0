@@ -20,6 +20,7 @@ import React from 'react';
     import CampaignAnalyzer from '@/pages/superadmin/CampaignAnalyzer';
     import SystemVariables from '@/pages/superadmin/SystemVariables';
     import StrategicPlannerPage from '@/pages/superadmin/StrategicPlannerPage';
+    import SuperAdminGalleryImages from '@/pages/superadmin/GalleryImages';
     import WhisperTranscriber from '@/pages/user/WhisperTranscriber';
     
     import UserLayout from '@/components/UserLayout';
@@ -180,6 +181,7 @@ import React from 'react';
                         <Route path="variaveis" element={<SystemVariables />} />
                         <Route path="criar-site" element={<SuperAdminSiteProjectsList />} />
                         <Route path="transcritor" element={<WhisperTranscriber />} />
+                        <Route path="galeria-imagens" element={<SuperAdminGalleryImages />} />
                     </Route>
     
                     <Route 

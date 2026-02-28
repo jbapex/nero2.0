@@ -164,9 +164,15 @@ const NeuroDesignPage = () => {
       toast({ title: 'Selecione uma galeria', variant: 'destructive' });
       return;
     }
-    if (config?.text_enabled && !((config.headline_h1 || '').trim() || (config.subheadline_h2 || '').trim() || (config.cta_button_text || '').trim())) {
-      toast({ title: "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA.", variant: 'destructive' });
-      return;
+    if (config?.text_enabled) {
+      const isFreeMode = (config.text_mode || 'structured') === 'free';
+      const valid = isFreeMode
+        ? Boolean((config.custom_text || '').trim() || config.use_reference_image_text)
+        : Boolean((config.headline_h1 || '').trim() || (config.subheadline_h2 || '').trim() || (config.cta_button_text || '').trim());
+      if (!valid) {
+        toast({ title: isFreeMode ? "Com 'Texto na imagem' em modo livre, preencha o texto ou ative 'Usar texto da imagem de referência'." : "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA.", variant: 'destructive' });
+        return;
+      }
     }
     generatingRef.current = true;
     setIsGenerating(true);
@@ -308,7 +314,7 @@ const NeuroDesignPage = () => {
   const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
     'subject_enabled', 'subject_gender', 'subject_description', 'quantity', 'niche_project', 'environment',
     'shot_type', 'layout_position', 'dimensions', 'image_size', 'use_scenario_photos',
-    'text_enabled', 'headline_h1', 'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
+    'text_enabled', 'text_mode', 'custom_text', 'custom_text_font_description', 'use_reference_image_text', 'headline_h1', 'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
     'headline_zone', 'subheadline_zone', 'cta_zone',
     'headline_font', 'subheadline_font', 'cta_font',
     'headline_color', 'subheadline_color', 'cta_color',
@@ -325,6 +331,7 @@ const NeuroDesignPage = () => {
     layout_position: ['esquerda', 'centro', 'direita'],
     dimensions: ['1:1', '4:5', '9:16', '16:9'],
     text_position: ['esquerda', 'centro', 'direita'],
+    text_mode: ['structured', 'free'],
     image_size: ['1K', '2K', '4K'],
     headline_zone: ZONE_VALUES,
     subheadline_zone: ZONE_VALUES,
@@ -408,7 +415,11 @@ Chaves e valores (use exatamente assim no JSON quando preencher):
 - layout_position: "esquerda" ou "centro" ou "direita"
 - dimensions: "1:1" ou "4:5" ou "9:16" ou "16:9"
 - image_size: "1K" ou "2K" ou "4K"
-- text_enabled: true ou false. Se true: headline_h1, subheadline_h2, cta_button_text (strings)
+- text_enabled: true ou false. Se true: headline_h1, subheadline_h2, cta_button_text (strings). Para texto corrido/parágrafo use text_mode "free" e custom_text.
+- text_mode: "structured" ou "free". Use "free" quando o brief pedir texto corrido, parágrafo ou bloco na imagem (ex.: card, post); use "structured" para título, subtítulo e botão (headline, subheadline, CTA).
+- custom_text: string; quando text_mode for "free", o texto completo a aparecer na imagem.
+- custom_text_font_description: string opcional; descrição da fonte (ex.: "sans serifa, negrito", "moderna").
+- use_reference_image_text: boolean; true se o brief indicar que o texto deve ser copiado/extraído da imagem de referência.
 - text_position: "esquerda" ou "centro" ou "direita"
 - headline_zone, subheadline_zone, cta_zone: posição do texto no quadro. Valores: "top-left", "top-center", "top-right", "center-left", "center", "center-right", "bottom-left", "bottom-center", "bottom-right"
 - headline_font, subheadline_font, cta_font: "sans", "serif", "bold", "modern" ou "" (sistema decide)
@@ -444,7 +455,7 @@ Responda somente com o JSON.`;
       const parsed = parseNeuroDesignFillResponse(raw);
       if (!parsed || typeof parsed !== 'object') throw new Error('Resposta da IA não contém JSON válido.');
       const COLOR_KEYS = new Set(['headline_color', 'subheadline_color', 'cta_color', 'headline_shape_color', 'subheadline_shape_color', 'cta_shape_color', 'text_color', 'text_shape_color', 'ambient_color', 'rim_light_color', 'fill_light_color']);
-      const BOOL_KEYS = new Set(['text_enabled', 'text_gradient', 'floating_elements_enabled', 'subject_enabled', 'use_scenario_photos', 'headline_shape_enabled', 'subheadline_shape_enabled', 'cta_shape_enabled', 'text_shape_enabled']);
+      const BOOL_KEYS = new Set(['text_enabled', 'text_gradient', 'floating_elements_enabled', 'subject_enabled', 'use_scenario_photos', 'use_reference_image_text', 'headline_shape_enabled', 'subheadline_shape_enabled', 'cta_shape_enabled', 'text_shape_enabled']);
       const sanitized = {};
       for (const key of Object.keys(parsed)) {
         if (!NEURODESIGN_FILL_ALLOWED_KEYS.has(key)) continue;

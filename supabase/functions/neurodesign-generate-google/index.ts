@@ -54,6 +54,22 @@ function buildPrompt(config: Record<string, unknown>): string {
 
   const textBlockParts: string[] = [];
   if (!textOff && config.text_enabled) {
+    const isFreeMode = (config.text_mode as string) === "free";
+    if (isFreeMode) {
+      const useRefText = config.use_reference_image_text === true || config.use_reference_image_text === "true";
+      const customText = (config.custom_text as string)?.trim() || "";
+      const fontDesc = (config.custom_text_font_description as string)?.trim() || "";
+      if (useRefText) {
+        textBlockParts.push("O texto exibido na imagem deve ser o mesmo que aparece na(s) imagem(ns) de referência anexa(s), reproduzindo-o de forma legível e integrada à cena.");
+      }
+      if (customText) {
+        textBlockParts.push("OBRIGATÓRIO - TEXTO VISÍVEL NA IMAGEM: A arte deve exibir este texto de forma clara e legível, sem alterar uma letra: \"" + customText + "\".");
+        if (fontDesc) textBlockParts.push("Fonte/estilo do texto: " + fontDesc + ".");
+      }
+      if (!useRefText && !customText) {
+        textBlockParts.push("Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).");
+      }
+    } else {
     const h1 = (config.headline_h1 as string)?.trim() || "";
     const h2 = (config.subheadline_h2 as string)?.trim() || "";
     const cta = (config.cta_button_text as string)?.trim() || "";
@@ -107,6 +123,7 @@ function buildPrompt(config: Record<string, unknown>): string {
     } else {
       textBlockParts.push("Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).");
     }
+    }
   }
 
   const parts: string[] = [];
@@ -133,6 +150,19 @@ function buildPrompt(config: Record<string, unknown>): string {
   if (shot) parts.push(`Enquadramento: ${shot}.`);
   if (layoutPos) parts.push(`Posição do sujeito: ${layoutPos}.`);
   if (!textOff && config.text_enabled) {
+    const isFreeMode = (config.text_mode as string) === "free";
+    if (isFreeMode) {
+      const useRefText = config.use_reference_image_text === true || config.use_reference_image_text === "true";
+      const customText = (config.custom_text as string)?.trim() || "";
+      const fontDesc = (config.custom_text_font_description as string)?.trim() || "";
+      if (useRefText) parts.push("Espaço reservado para texto na composição. O texto exibido deve ser o mesmo das imagens de referência anexas.");
+      if (customText) {
+        parts.push("Espaço reservado para texto na composição.");
+        parts.push("O texto exibido na imagem deve ser exatamente: \"" + customText + "\".");
+        if (fontDesc) parts.push("Fonte/estilo do texto: " + fontDesc + ".");
+      }
+      if (!useRefText && !customText) parts.push("Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).");
+    } else {
     const h1 = (config.headline_h1 as string)?.trim() || "";
     const h2 = (config.subheadline_h2 as string)?.trim() || "";
     const cta = (config.cta_button_text as string)?.trim() || "";
@@ -179,6 +209,7 @@ function buildPrompt(config: Record<string, unknown>): string {
       }
     } else {
       parts.push("Não incluir texto, títulos, subtítulos ou botões na imagem (nenhum texto foi definido pelo usuário).");
+    }
     }
   }
   const attrs = (config.visual_attributes as Record<string, unknown>) || {};

@@ -339,6 +339,37 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
         </div>
         {localConfig.text_enabled && (
           <div className="mt-2 space-y-4">
+            <div>
+              <Label className="text-xs mb-1 block">Modo</Label>
+              <Select value={localConfig.text_mode || 'structured'} onValueChange={(v) => update('text_mode', v)}>
+                <SelectTrigger className="h-8 min-h-10 sm:min-h-0 bg-muted border-border text-foreground text-base sm:text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  <SelectItem value="structured">Padrão (título, subtítulo, CTA)</SelectItem>
+                  <SelectItem value="free">Texto livre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(localConfig.text_mode || 'structured') === 'free' ? (
+              <div className="space-y-3 rounded-md border border-border p-2">
+                <div>
+                  <Label className="text-xs font-medium">Texto a exibir na imagem</Label>
+                  <Textarea placeholder="Digite o texto (ex.: parágrafo para card)" value={localConfig.custom_text || ''} onChange={(e) => update('custom_text', e.target.value)} className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[80px]" />
+                </div>
+                <div>
+                  <Label className="text-xs">Descrição da fonte (opcional)</Label>
+                  <Input placeholder="Ex.: sans serifa, negrito" value={localConfig.custom_text_font_description || ''} onChange={(e) => update('custom_text_font_description', e.target.value)} className="mt-1 bg-muted border-border text-foreground placeholder:text-muted-foreground" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Usar texto da imagem de referência</Label>
+                  <Switch checked={!!localConfig.use_reference_image_text} onCheckedChange={(v) => update('use_reference_image_text', v)} />
+                </div>
+                <p className="text-xs text-muted-foreground">Ative para a IA reproduzir o texto visível na(s) imagem(ns) de referência na arte gerada.</p>
+              </div>
+            ) : (
+              <>
             {/* Título */}
             <div className="space-y-2 rounded-md border border-border p-2">
               <Label className="text-xs font-medium">Título</Label>
@@ -499,6 +530,8 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
               <Switch checked={!!localConfig.text_gradient} onCheckedChange={(v) => update('text_gradient', v)} />
               <Label className="text-xs">Gradiente no texto</Label>
             </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -722,16 +755,21 @@ const BuilderPanel = ({ project, config, setConfig, imageConnections, onGenerate
       <div className="flex gap-2">
         {(() => {
           const hasConnection = localConfig.user_ai_connection_id && localConfig.user_ai_connection_id !== 'none';
-          const hasTextFilled = !localConfig.text_enabled || Boolean(
-            (localConfig.headline_h1 || '').trim() ||
-            (localConfig.subheadline_h2 || '').trim() ||
-            (localConfig.cta_button_text || '').trim()
-          );
+          const isFreeMode = (localConfig.text_mode || 'structured') === 'free';
+          const hasTextFilled = !localConfig.text_enabled || (isFreeMode
+            ? Boolean((localConfig.custom_text || '').trim() || localConfig.use_reference_image_text)
+            : Boolean(
+                (localConfig.headline_h1 || '').trim() ||
+                (localConfig.subheadline_h2 || '').trim() ||
+                (localConfig.cta_button_text || '').trim()
+              ));
           const disabled = isGenerating || !hasConnection || !hasTextFilled;
           const title = !hasConnection
             ? 'Selecione uma conexão de imagem para gerar'
             : !hasTextFilled
-              ? "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA"
+              ? isFreeMode
+                ? "Com 'Texto na imagem' em modo livre, preencha o texto ou ative 'Usar texto da imagem de referência'"
+                : "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA"
               : undefined;
           return (
         <Button

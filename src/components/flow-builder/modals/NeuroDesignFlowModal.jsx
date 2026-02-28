@@ -46,7 +46,7 @@ function buildFlowContextText(inputData) {
 
 const NEURODESIGN_FILL_ALLOWED_KEYS = new Set([
   'subject_gender', 'subject_description', 'niche_project', 'environment',
-  'shot_type', 'layout_position', 'dimensions', 'image_size', 'text_enabled', 'headline_h1',
+  'shot_type', 'layout_position', 'dimensions', 'image_size', 'text_enabled', 'text_mode', 'custom_text', 'custom_text_font_description', 'use_reference_image_text', 'headline_h1',
   'subheadline_h2', 'cta_button_text', 'text_position', 'text_gradient',
   'visual_attributes', 'ambient_color', 'rim_light_color', 'fill_light_color',
   'floating_elements_enabled', 'floating_elements_text', 'additional_prompt',
@@ -57,6 +57,7 @@ const NEURODESIGN_FILL_ENUMS = {
   layout_position: ['esquerda', 'centro', 'direita'],
   dimensions: ['1:1', '4:5', '9:16', '16:9'],
   text_position: ['esquerda', 'centro', 'direita'],
+  text_mode: ['structured', 'free'],
   image_size: ['1K', '2K', '4K'],
 };
 const NEURODESIGN_STYLE_TAGS = ['clássico', 'formal', 'elegante', 'institucional', 'tecnológico', 'minimalista', 'criativo'];
@@ -237,9 +238,15 @@ const NeuroDesignFlowModal = ({ open, onOpenChange, inputData, onResult, embedde
       toast({ title: 'Projeto ainda não carregou', variant: 'destructive' });
       return;
     }
-    if (config?.text_enabled && !((config.headline_h1 || '').trim() || (config.subheadline_h2 || '').trim() || (config.cta_button_text || '').trim())) {
-      toast({ title: "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA.", variant: 'destructive' });
-      return;
+    if (config?.text_enabled) {
+      const isFreeMode = (config.text_mode || 'structured') === 'free';
+      const valid = isFreeMode
+        ? Boolean((config.custom_text || '').trim() || config.use_reference_image_text)
+        : Boolean((config.headline_h1 || '').trim() || (config.subheadline_h2 || '').trim() || (config.cta_button_text || '').trim());
+      if (!valid) {
+        toast({ title: isFreeMode ? "Com 'Texto na imagem' em modo livre, preencha o texto ou ative 'Usar texto da imagem de referência'." : "Com 'Texto na imagem' ativado, preencha pelo menos um campo: Título H1, Subtítulo H2 ou Texto do botão CTA.", variant: 'destructive' });
+        return;
+      }
     }
     generatingRef.current = true;
     setIsGenerating(true);
@@ -387,7 +394,11 @@ Chaves e valores exatos obrigatórios (use exatamente assim no JSON):
 - layout_position: exatamente "esquerda" ou "centro" ou "direita"
 - dimensions: exatamente "1:1" ou "4:5" ou "9:16" ou "16:9"
 - image_size: exatamente "1K" ou "2K" ou "4K" (qualidade da imagem)
-- text_enabled: true ou false. Se true, preencha headline_h1, subheadline_h2, cta_button_text
+- text_enabled: true ou false. Se true, preencha headline_h1, subheadline_h2, cta_button_text. Para texto corrido/parágrafo use text_mode "free" e custom_text.
+- text_mode: "structured" ou "free". Use "free" quando o brief pedir texto corrido, parágrafo ou bloco na imagem (ex.: card, post); use "structured" para título, subtítulo e botão (headline, subheadline, CTA).
+- custom_text: string; quando text_mode for "free", o texto completo a aparecer na imagem.
+- custom_text_font_description: string opcional; descrição da fonte (ex.: "sans serifa, negrito", "moderna").
+- use_reference_image_text: boolean; true se o brief indicar que o texto deve ser copiado/extraído da imagem de referência.
 - text_position: "esquerda" ou "centro" ou "direita"
 - visual_attributes: objeto com style_tags (array só com: clássico, formal, elegante, institucional, tecnológico, minimalista, criativo), sobriety (número 0-100), ultra_realistic, blur_enabled, lateral_gradient_enabled (boolean)
 - additional_prompt: string com instruções extras para a IA de imagem
@@ -444,7 +455,7 @@ Responda somente com o JSON.`;
           if (typeof value.blur_enabled === 'boolean') next.blur_enabled = value.blur_enabled;
           if (typeof value.lateral_gradient_enabled === 'boolean') next.lateral_gradient_enabled = value.lateral_gradient_enabled;
           sanitized[key] = next;
-        } else if (key === 'text_enabled' || key === 'text_gradient' || key === 'floating_elements_enabled') {
+        } else if (key === 'text_enabled' || key === 'text_gradient' || key === 'floating_elements_enabled' || key === 'use_reference_image_text') {
           sanitized[key] = Boolean(value);
         } else if (typeof value === 'string' || typeof value === 'number') {
           sanitized[key] = value;
