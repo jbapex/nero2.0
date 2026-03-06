@@ -31,18 +31,24 @@ cp .env.example .env.local
 
 Edite `.env.local` com suas credenciais Supabase e outras chaves (OpenAI, etc.), conforme o README principal.
 
-### 4. Banco de dados (Supabase)
+### 4. Banco de dados (Supabase local)
 
-As migrações em `supabase/migrations/` contêm todo o schema essencial. Para aplicar:
-
-**Supabase hospedado:** no dashboard do projeto, use SQL ou link do Supabase CLI.
-
-**Supabase local:**
+O repositório já inclui `supabase/migrations/` e `supabase/functions/`. Para rodar o Supabase localmente (Docker necessário):
 
 ```bash
+# Inicializar Supabase no projeto (cria config.toml se não existir)
+npx supabase init
+
+# Subir containers locais (Postgres, Auth, etc.)
 npx supabase start
+
+# Aplicar todas as migrações
 npx supabase db push
 ```
+
+Depois use as URL/keys que o `supabase start` mostrar no `.env.local` (API URL e anon key do projeto local).
+
+**Supabase hospedado:** no dashboard do projeto, rode as migrações manualmente ou link com `supabase link` e use `supabase db push`.
 
 ### 5. Rodar em desenvolvimento
 
