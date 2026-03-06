@@ -1,193 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Brain, Lock, Mail, User, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/customSupabaseClient';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { toast } = useToast();
+  const location = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get('session_expired') === '1') {
-      toast({
-        title: 'Sessão expirada',
-        description: 'Sua sessão expirou ou foi encerrada. Faça login novamente.',
-        variant: 'destructive',
-      });
-    }
-  }, [searchParams, toast]);
+  const from = location.state?.from?.pathname || '/campanhas';
 
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
-  };
-
-  const handleAuth = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!email.trim() || !password) {
+      toast.error('Preencha e-mail e senha.');
+      return;
+    }
     setLoading(true);
-
-    const LOGIN_TIMEOUT_MS = 15000;
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Login está demorando. Verifique sua conexão com a internet e tente novamente.')), LOGIN_TIMEOUT_MS)
-    );
-
     try {
-      if (isLogin) {
-        const signInPromise = supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-        const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
-        if (error) {
-          if (import.meta.env.DEV) {
-            console.warn('[Auth] signIn error:', { status: error.status, code: error.code, message: error.message });
-          }
-          throw error;
-        }
-        if (data?.session) {
-          toast({ title: "Login realizado com sucesso!", description: "Bem-vindo de volta!" });
-        }
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      if (data?.user?.user_metadata?.user_type === 'super_admin') {
+        navigate('/superadmin/dashboard', { replace: true });
       } else {
-        // Validação antes do signup: senha mínima 6 caracteres e e-mail válido
-        const emailTrimmed = (formData.email || '').trim();
-        const password = formData.password || '';
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(emailTrimmed)) {
-          toast({
-            title: "E-mail inválido",
-            description: "Digite um e-mail válido (ex.: seu@email.com).",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-        if (password.length < 6) {
-          toast({
-            title: "Senha muito curta",
-            description: "A senha deve ter no mínimo 6 caracteres.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        const signUpPromise = supabase.auth.signUp({
-          email: emailTrimmed,
-          password,
-          options: {
-            data: {
-              name: formData.name,
-              user_type: 'user',
-            },
-          },
-        });
-        const { data, error } = await Promise.race([signUpPromise, timeoutPromise]);
-        if (error) throw error;
-        if (data?.user) {
-          toast({ title: "Cadastro realizado!", description: "Verifique seu e-mail para confirmação." });
-          setIsLogin(true);
-        }
+        navigate(from, { replace: true });
       }
-    } catch (error) {
-      const raw = error?.message || '';
-      const status = error?.status;
-      const isAlreadyRegistered = /user already registered|already been registered|email.*already/i.test(raw);
-      const isNetwork = /fetch|network|failed to fetch|cors|timeout|unreachable/i.test(raw) || error?.name === 'TypeError';
-      const isTimeout = raw.includes('demorando');
-      const isCredentialError = /invalid.*credential|invalid.*login|email not confirmed/i.test(raw);
-      const isBadKey = (status === 401 || status === 403) && !isCredentialError && /jwt|key|api|token/i.test(raw);
-      let title = "Erro de Autenticação";
-      let message = raw || "Verifique suas credenciais e tente novamente.";
-      if (isAlreadyRegistered || (status === 422 && /already|registered/i.test(raw))) {
-        title = "E-mail já cadastrado";
-        message = "Este e-mail já está em uso. Faça login ou use \"Esqueci a senha\" para recuperar o acesso.";
-        setIsLogin(true);
-      } else if (status === 422) {
-        title = "Cadastro não realizado";
-        message = raw || "Dados inválidos. Verifique: e-mail (não utilizado em outra conta) e senha (mínimo 6 caracteres).";
-      } else if (isNetwork || isTimeout) {
-        title = "Sem conexão com o servidor";
-        message = "Não foi possível conectar ao Supabase. Verifique a URL em .env.local e sua conexão.";
-      } else if (isBadKey) {
-        title = "Chave do Supabase incorreta";
-        message = "A chave anon (VITE_SUPABASE_ANON_KEY) não pertence a este servidor. No painel do Supabase, Project Settings > API: copie URL e anon key para o .env.local.";
-      } else if (isCredentialError || raw === "Invalid authentication credentials") {
-        title = "Login não autorizado";
-        message = "O servidor rejeitou o login. Confira: (1) A conta foi criada neste mesmo Supabase (URL do .env.local)? (2) No painel Supabase: Auth → URL Configuration → adicione http://localhost:3000 em Redirect URLs. (3) Auth → Providers → Email: se \"Confirm email\" estiver ativo, confirme o e-mail antes de logar.";
-      }
-      toast({
-        title,
-        description: message,
-        variant: "destructive",
-      });
+      toast.success('Login realizado.');
+    } catch (err) {
+      toast.error(err?.message || 'Erro ao fazer login.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 py-6 bg-gradient-to-br from-blue-100 to-purple-200 dark:from-gray-900 dark:to-black overflow-x-hidden">
-       <div className="absolute inset-0 overflow-hidden">
-        <motion.div animate={{ x: [0, 100, 0], y: [0, -100, 0], rotate: [0, 180, 360] }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/10 rounded-full blur-2xl" />
-        <motion.div animate={{ x: [0, -100, 0], y: [0, 100, 0], rotate: [360, 180, 0] }} transition={{ duration: 25, repeat: Infinity, ease: "linear" }} className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-secondary/10 rounded-full blur-2xl" />
-      </div>
-
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="relative z-10 w-full max-w-md px-0">
-        <Card className="bg-card/80 backdrop-blur-sm border-border shadow-2xl dark:border-white/10">
-          <CardHeader className="text-center">
-            <div className="mx-auto bg-primary/10 p-4 rounded-full inline-block">
-                <Brain className="w-10 h-10 text-primary" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Entrar</CardTitle>
+          <CardDescription>Use seu e-mail e senha para acessar o Neuro Ápice.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                disabled={loading}
+              />
             </div>
-            <CardTitle className="text-3xl font-bold text-foreground mt-4">Neuro Ápice</CardTitle>
-            <CardDescription className="text-muted-foreground mt-2">{isLogin ? 'Faça login para continuar' : 'Crie sua conta para começar'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAuth} className="space-y-4">
-              {!isLogin && (
-                 <div className="space-y-2">
-                  <Label htmlFor="name">Nome Completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input id="name" type="text" value={formData.name} onChange={handleInputChange} placeholder="Seu nome" className="pl-10 bg-input border-input text-foreground placeholder:text-muted-foreground" required />
-                  </div>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="seu@email.com" className="pl-10 bg-input border-input text-foreground placeholder:text-muted-foreground" required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="password" type="password" value={formData.password} onChange={handleInputChange} placeholder="Sua senha" className="pl-10 bg-input border-input text-foreground placeholder:text-muted-foreground" required />
-                </div>
-              </div>
-              <Button type="submit" className="w-full min-h-[44px] touch-target" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? 'Entrar' : 'Cadastrar')}
-              </Button>
-            </form>
-            <div className="mt-6 text-center">
-              <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-muted-foreground hover:text-primary">
-                {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={loading}
+              />
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Entrar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

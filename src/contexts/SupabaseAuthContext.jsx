@@ -1,237 +1,203 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { useToast } from '@/components/ui/use-toast';
 
-const AuthContext = createContext(undefined);
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const { toast } = useToast();
-  const userRef = useRef(null);
-  const signOutInitiatedByUserRef = useRef(false);
-
-  const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  userRef.current = user;
-
-  const fetchProfile = useCallback(async (userId) => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
-    const { data, error } = await supabase.rpc('get_or_create_profile');
-
-    if (error) {
-      console.error('Error fetching profile:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao buscar perfil",
-        description: "Não foi possível carregar os dados do seu perfil.",
-      });
-      setProfile(null);
-      return;
-    }
-
-    let profileData = data?.profile ?? null;
-    if (!profileData) {
-      setProfile(null);
-      return;
-    }
-
-    // Se a RPC não retorna os campos do plano, enriquece o perfil buscando o plano pelo plan_id
-    let planId = profileData.plan_id ?? profileData.plan?.id;
-    if (!planId) {
-      const { data: profileRow } = await supabase.from('profiles').select('plan_id').eq('id', userId).single();
-      planId = profileRow?.plan_id ?? null;
-    }
-    if (planId) {
-      const { data: planRow } = await supabase
-        .from('plans')
-        .select('has_site_builder_access, has_ads_access, has_strategic_planner_access, has_campaign_analyzer_access, has_image_generator_access, has_ai_chat_access, has_creative_flow_access, has_transcriber_access, has_trending_topics_access, has_keyword_planner_access, has_publication_calendar_access, has_neurodesign_access')
-        .eq('id', planId)
-        .single();
-
-      if (planRow) {
-        profileData = {
-          ...profileData,
-          plans: { ...profileData.plans, ...planRow },
-          ...planRow,
-        };
+  const loadProfile = useCallback(
+    async (userId) => {
+      if (!userId) {
+        setProfile(null);
+        return;
       }
-    }
+      setProfileLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-    setProfile(profileData);
-  }, [toast]);
+        if (error) {
+          console.error('Erro ao carregar perfil:', error);
+          setProfile(null);
+          return;
+        }
 
-  const handleSession = useCallback((session) => {
-    setSession(session);
-    const currentUser = session?.user ?? null;
-    setUser(currentUser);
-    setLoading(false);
-    if (!currentUser) {
-      setProfile(null);
-      setProfileLoading(false);
-      return;
-    }
-    setProfileLoading(true);
-    fetchProfile(currentUser.id)
-      .then(() => setProfileLoading(false))
-      .catch(() => setProfileLoading(false));
-  }, [fetchProfile]);
+        setProfile(data || null);
+      } finally {
+        setProfileLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    const SESSION_TIMEOUT_MS = 4000;
-    const timeoutId = setTimeout(() => setLoading(false), SESSION_TIMEOUT_MS);
+    let authSubscription;
 
-    const getSession = async () => {
+    const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        clearTimeout(timeoutId);
-        handleSession(session);
-      } catch (e) {
-        clearTimeout(timeoutId);
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          setLoading(false);
+          return;
+        }
+
+        const currentSession = data?.session ?? null;
+        setSession(currentSession);
+        const currentUser = currentSession?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser?.id) {
+          await loadProfile(currentUser.id);
+        } else {
+          setProfile(null);
+        }
+      } finally {
         setLoading(false);
       }
+
+      const { data: listener } = supabase.auth.onAuthStateChange(
+        async (_event, newSession) => {
+          setSession(newSession);
+          const nextUser = newSession?.user ?? null;
+          setUser(nextUser);
+
+          if (nextUser?.id) {
+            await loadProfile(nextUser.id);
+          } else {
+            setProfile(null);
+          }
+        }
+      );
+
+      authSubscription = listener;
     };
 
-    getSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        const hadUser = !!userRef.current;
-        const hasSession = !!session?.user;
-        if (hadUser && !hasSession && !signOutInitiatedByUserRef.current) {
-          toast({
-            title: "Sessão expirada",
-            description: "Sua sessão não é mais válida. Faça login novamente.",
-            variant: "destructive",
-          });
-        }
-        signOutInitiatedByUserRef.current = false;
-        if (event === 'SIGNED_OUT') {
-          setProfile(null);
-          setProfileLoading(false);
-        }
-        handleSession(session);
-      }
-    );
+    init();
 
     return () => {
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      try {
+        authSubscription?.subscription?.unsubscribe();
+      } catch {
+        // ignora erros ao desinscrever
+      }
     };
-  }, [handleSession]);
+  }, [loadProfile]);
 
-  const signUp = useCallback(async (email, password, options) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options,
-    });
-
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Sign up Failed",
-        description: error.message || "Something went wrong",
-      });
-    }
-
-    return { error };
-  }, [toast]);
-
-  const signIn = useCallback(async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Sign in Failed",
-        description: error.message || "Something went wrong",
-      });
-    }
-
-    return { error };
-  }, [toast]);
+  const refreshProfile = useCallback(async () => {
+    if (!user?.id) return;
+    await loadProfile(user.id);
+  }, [user, loadProfile]);
 
   const signOut = useCallback(async () => {
-    signOutInitiatedByUserRef.current = true;
-    let { error } = await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+    }
+  }, []);
 
-    // 403 = sem sessão válida para encerrar; tratar como "já deslogado" e não chamar signOut(scope: 'local')
-    const is403 = error?.status === 403;
-    const sessionInvalid = error?.message?.toLowerCase().includes('session') && error?.message?.toLowerCase().includes('does not exist');
-    if (error && (is403 || sessionInvalid)) {
-      if (!is403) {
-        await supabase.auth.signOut({ scope: 'local' });
+  const hasPermission = useCallback(
+    (key, entityId) => {
+      if (!profile) return false;
+
+      if (profile.user_type === 'super_admin') {
+        return true;
       }
-      error = null;
-      toast({
-        title: "Sessão encerrada",
-        description: "Você já pode fazer login novamente.",
-      });
-    } else if (error) {
-      toast({
-        variant: "destructive",
-        title: "Erro ao sair",
-        description: error.message || "Algo deu errado ao encerrar a sessão.",
-      });
+
+      if (!key) return true;
+
+      if (key === 'ads') {
+        return Boolean(
+          profile.plans?.has_ads_access ||
+            profile.has_ads_access ||
+            profile.ads_access
+        );
+      }
+
+      if (key === 'custom_ai') {
+        return Boolean(
+          profile.plans?.has_custom_ai ||
+            profile.has_custom_ai ||
+            profile.custom_ai_enabled
+        );
+      }
+
+      if (key === 'module_access') {
+        if (!entityId) return true;
+        if (Array.isArray(profile.allowed_modules)) {
+          return profile.allowed_modules.includes(entityId);
+        }
+        return true;
+      }
+
+      if (key === 'ads_agent_access') {
+        if (!entityId) return true;
+        if (Array.isArray(profile.allowed_ads_agents)) {
+          return profile.allowed_ads_agents.includes(entityId);
+        }
+        return true;
+      }
+
+      return true;
+    },
+    [profile]
+  );
+
+  const getLlmIntegrations = useCallback(async () => {
+    if (!user?.id) return [];
+
+    const { data, error } = await supabase
+      .from('user_ai_connections')
+      .select('id, name, provider, type, is_default')
+      .eq('user_id', user.id)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Erro ao carregar conexões de IA:', error);
+      return [];
     }
 
-    setSession(null);
-    setUser(null);
-    setProfile(null);
-    return { error };
-  }, [toast]);
+    return data || [];
+  }, [user]);
 
-  const hasPermission = useCallback((permissionKey, entityId = null) => {
-    if (!profile) return false;
-    if (profile.user_type === 'super_admin') return true;
-    if (!permissionKey) return true; // Allows access if no specific permission is required
-
-    // Handle module access check
-    if (permissionKey === 'module_access' && entityId) {
-      // Check if module is in user's plan modules
-      const planHasModule = profile.plan_modules?.includes(entityId);
-      // Check if module is directly assigned to user
-      const userHasModule = profile.user_modules?.includes(entityId);
-      
-      return planHasModule || userHasModule;
-    }
-
-    // Handle general feature access checks (e.g., 'site_builder', 'ads', 'neurodesign')
-    // Considera tanto o campo no perfil (flat) quanto no plano (profile.plans)
-    const profileKey = `has_${permissionKey}_access`;
-    return !!profile[profileKey] || !!profile.plans?.[profileKey];
-  }, [profile]);
-
-
-  const value = useMemo(() => ({
-    user,
+  const value = {
     session,
+    user,
     profile,
     loading,
     profileLoading,
-    signUp,
-    signIn,
+    authLoading: loading || profileLoading,
     signOut,
+    refreshProfile,
     hasPermission,
-  }), [user, session, profile, loading, profileLoading, signUp, signIn, signOut, hasPermission]);
+    getLlmIntegrations,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de AuthProvider');
   }
   return context;
 };
+
