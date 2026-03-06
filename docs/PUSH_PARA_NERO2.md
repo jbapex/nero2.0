@@ -21,12 +21,17 @@ Se o repositório no seu PC estiver desatualizado em relação a esta VPS, atual
 ## Opção 2: Push a partir desta VPS com token
 
 1. No GitHub: **Settings → Developer settings → Personal access tokens**, crie um token com permissão `repo`.
-2. Nesta máquina, rode (substitua `SEU_TOKEN`):
+2. Nesta máquina (sem colar o token na linha de comando):
 
 ```bash
 cd /root/neuroapice
-git push https://jbapex:SEU_TOKEN@github.com/jbapex/nero2.0.git main
+export GITHUB_TOKEN=seu_token_aqui   # só nesta sessão
+git push https://jbapex:${GITHUB_TOKEN}@github.com/jbapex/nero2.0.git main
+unset GITHUB_TOKEN
 ```
+
+Ou em uma linha, substituindo `SEU_TOKEN`:  
+`git push https://jbapex:SEU_TOKEN@github.com/jbapex/nero2.0.git main`
 
 Não compartilhe o token e não o deixe em scripts versionados.
 
